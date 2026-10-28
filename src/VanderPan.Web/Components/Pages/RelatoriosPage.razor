@@ -1,0 +1,150 @@
+@page "/relatorios"
+@inject ApiService Api
+
+<PageTitle>Relatórios - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Relatórios de Gestão</h2>
+        <p class="text-muted mb-0">Consolidação de vendas, desempenho de vendedores e carteira de cobrança</p>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="CarregarDados">
+        🔄 Atualizar Dados
+    </button>
+</div>
+
+@if (carregando)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <!-- VENDAS POR VENDEDOR -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0">Desempenho por Vendedor</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Vendedor</th>
+                                    <th class="text-center">Qtd Vendas</th>
+                                    <th class="text-end">Volume Faturado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var v in vendasPorVendedor)
+                                {
+                                    <tr>
+                                        <td class="fw-bold">@v.Nome</td>
+                                        <td class="text-center">@v.Qtd</td>
+                                        <td class="text-end fw-bold text-success">R$ @v.Total.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COBRANÇA E INADIMPLÊNCIA -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0">Resumo da Carteira de Cobrança</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 text-center mb-4">
+                        <div class="col-4">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <small class="text-muted d-block">Títulos em Aberto</small>
+                                <h4 class="fw-bold text-dark mt-1 mb-0">R$ @totalAberto.ToString("N2")</h4>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 bg-light rounded-3 border border-danger">
+                                <small class="text-danger d-block fw-semibold">Títulos Vencidos</small>
+                                <h4 class="fw-bold text-danger mt-1 mb-0">R$ @totalVencido.ToString("N2")</h4>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 bg-light rounded-3 border border-success">
+                                <small class="text-success d-block fw-semibold">Títulos Pagos</small>
+                                <h4 class="fw-bold text-success mt-1 mb-0">R$ @totalPago.ToString("N2")</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold mb-2">Índice de Inadimplência da Distribuidora:</h6>
+                        @{
+                            var baseTotal = totalAberto + totalVencido;
+                            var percInadimplencia = baseTotal > 0 ? (totalVencido / baseTotal) * 100m : 0m;
+                        }
+                        <div class="progress mb-2" style="height: 20px;">
+                            <div class="progress-bar bg-danger" role="progressbar" style="width: @percInadimplencia.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%;">
+                                @percInadimplencia.ToString("0.0")%
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            Clientes com débitos vencidos são automaticamente sinalizados com menor prioridade no cálculo de corte de pedidos.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<VendaPorVendedorItem> vendasPorVendedor = new();
+    private decimal totalAberto;
+    private decimal totalVencido;
+    private decimal totalPago;
+
+    public class VendaPorVendedorItem
+    {
+        public string Nome { get; set; } = string.Empty;
+        public int Qtd { get; set; }
+        public decimal Total { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        carregando = true;
+
+        var vendas = await Api.GetVendasAsync();
+        vendasPorVendedor = vendas
+            .GroupBy(v => v.Vendedor?.Nome ?? "Sem Vendedor")
+            .Select(g => new VendaPorVendedorItem
+            {
+                Nome = g.Key,
+                Qtd = g.Count(),
+                Total = g.Sum(x => x.ValorTotal)
+            })
+            .OrderByDescending(x => x.Total)
+            .ToList();
+
+        var contas = await Api.GetContasReceberAsync();
+        var agora = DateTime.UtcNow.Date;
+
+        totalAberto = contas.Where(c => c.Status == StatusContaReceber.ABERTO && c.DataVencimento.Date >= agora).Sum(c => c.ValorOriginal);
+        totalVencido = contas.Where(c => c.Status == StatusContaReceber.VENCIDO || (c.Status == StatusContaReceber.ABERTO && c.DataVencimento.Date < agora)).Sum(c => c.ValorOriginal);
+        totalPago = contas.Where(c => c.Status == StatusContaReceber.PAGO).Sum(c => c.ValorPago);
+
+        carregando = false;
+    }
+}

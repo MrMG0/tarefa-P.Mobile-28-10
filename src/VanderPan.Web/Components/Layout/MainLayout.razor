@@ -1,0 +1,122 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthState Auth
+@inject ApiService Api
+@inject NavigationManager Nav
+
+@if (!Auth.IsAuthenticated)
+{
+    <div class="container py-5" style="max-width: 460px">
+        <div class="card border-0 shadow p-4">
+            <div class="text-center mb-3">
+                <div class="fs-1">🥖</div>
+                <h1 class="h3 fw-bold">VanderPan</h1>
+                <p class="text-muted">Acesso administrativo</p>
+            </div>
+            <form @onsubmit="EntrarAsync" @onsubmit:preventDefault>
+                <div class="mb-3">
+                    <label class="form-label" for="admin-email">E-mail</label>
+                    <input id="admin-email" class="form-control" type="email" @bind="email" autocomplete="username" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="admin-password">Senha</label>
+                    <input id="admin-password" class="form-control" type="password" @bind="senha" autocomplete="current-password" required />
+                </div>
+                @if (!string.IsNullOrWhiteSpace(erroLogin))
+                {
+                    <div class="alert alert-danger py-2">@erroLogin</div>
+                }
+                <button class="btn btn-primary w-100" type="submit" disabled="@entrando">
+                    @(entrando ? "Conectando..." : "Entrar")
+                </button>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <div class="top-row px-4 d-flex justify-content-between align-items-center bg-white border-bottom shadow-sm">
+                <div>
+                    <span class="badge bg-warning text-dark me-2">🥖 Distribuidora VanderPan</span>
+                    <span class="text-muted small">Painel de Gestão & Distribuição B2B</span>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="badge bg-light text-secondary border">⏰ Janelas de Entrega: 12h & 19h</span>
+                    <span class="fw-semibold text-dark">👤 @Auth.Nome</span>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="SairAsync">Sair</button>
+                </div>
+            </div>
+
+            <article class="content px-4 py-3">
+                @Body
+            </article>
+        </main>
+    </div>
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ocorreu um erro inesperado.
+    <a href="." class="reload">Recarregar</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private string email = string.Empty;
+    private string senha = string.Empty;
+    private string? erroLogin;
+    private bool entrando;
+
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += Atualizar;
+    }
+
+    private async Task EntrarAsync()
+    {
+        entrando = true;
+        erroLogin = null;
+        try
+        {
+            var resultado = await Api.LoginAdminAsync(email, senha);
+            if (resultado.Sucesso)
+            {
+                Auth.Login(resultado);
+                senha = string.Empty;
+            }
+            else
+            {
+                erroLogin = resultado.Mensagem;
+            }
+        }
+        finally
+        {
+            entrando = false;
+        }
+    }
+
+    private async Task SairAsync()
+    {
+        try
+        {
+            await Api.LogoutAsync();
+        }
+        finally
+        {
+            Auth.Logout();
+            Nav.NavigateTo("/");
+        }
+    }
+
+    private void Atualizar() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.OnChange -= Atualizar;
+    }
+}

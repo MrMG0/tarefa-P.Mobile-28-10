@@ -1,0 +1,131 @@
+@page "/estados"
+@inject ApiService Api
+
+<PageTitle>Estados - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Estados (UF)</h2>
+        <p class="text-muted mb-0">Unidades da federação para controle geográfico</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" @onclick="AbrirModalNovo">
+        ➕ Novo Estado
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome do Estado</th>
+                    <th>Sigla (UF)</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (carregando)
+                {
+                    <tr>
+                        <td colspan="3" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </td>
+                    </tr>
+                }
+                else if (!estados.Any())
+                {
+                    <tr>
+                        <td colspan="3" class="text-center py-4 text-muted">Nenhum estado cadastrado.</td>
+                    </tr>
+                }
+                @foreach (var e in estados)
+                {
+                    <tr>
+                        <td class="fw-bold">@e.Nome</td>
+                        <td><span class="badge bg-secondary">@e.Uf</span></td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => EditarEstado(e)">✏️</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ExcluirEstado(e.Id)">🗑️</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (exibirModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">@(estadoEmEdicao.Id == 0 ? "Novo Estado" : "Editar Estado")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => exibirModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nome do Estado *</label>
+                        <input type="text" class="form-control" @bind="estadoEmEdicao.Nome" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Sigla UF (2 caracteres) *</label>
+                        <input type="text" class="form-control" maxlength="2" @bind="estadoEmEdicao.Uf" required />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => exibirModal = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary fw-bold" @onclick="SalvarEstado">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<Estado> estados = new();
+    private bool exibirModal = false;
+    private Estado estadoEmEdicao = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarEstados();
+    }
+
+    private async Task CarregarEstados()
+    {
+        carregando = true;
+        estados = await Api.GetEstadosAsync();
+        carregando = false;
+    }
+
+    private void AbrirModalNovo()
+    {
+        estadoEmEdicao = new Estado();
+        exibirModal = true;
+    }
+
+    private void EditarEstado(Estado e)
+    {
+        estadoEmEdicao = new Estado { Id = e.Id, Nome = e.Nome, Uf = e.Uf, Ativo = e.Ativo };
+        exibirModal = true;
+    }
+
+    private async Task SalvarEstado()
+    {
+        if (string.IsNullOrWhiteSpace(estadoEmEdicao.Nome) || string.IsNullOrWhiteSpace(estadoEmEdicao.Uf)) return;
+        var ok = await Api.SalvarEstadoAsync(estadoEmEdicao);
+        if (ok)
+        {
+            exibirModal = false;
+            await CarregarEstados();
+        }
+    }
+
+    private async Task ExcluirEstado(int id)
+    {
+        var ok = await Api.ExcluirEstadoAsync(id);
+        if (ok) await CarregarEstados();
+    }
+}

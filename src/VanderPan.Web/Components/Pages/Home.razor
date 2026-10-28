@@ -1,0 +1,242 @@
+@page "/"
+@inject ApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>Dashboard - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Painel da Distribuidora</h2>
+        <p class="text-muted mb-0">Visão operacional de pedidos, entregas e contas a receber</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="corte" class="btn btn-warning fw-semibold shadow-sm">
+            ✂️ Processar Corte de Pedidos
+        </a>
+        <a href="pedidos" class="btn btn-primary fw-semibold shadow-sm">
+            📦 Ver Todos os Pedidos
+        </a>
+    </div>
+</div>
+
+@if (carregando)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Carregando métricas da distribuidora...</p>
+    </div>
+}
+else
+{
+    <!-- CARDS DE MÉTRICAS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 bg-light">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold text-uppercase">Pedidos Pendentes</span>
+                    <h3 class="fw-bold text-primary mt-1 mb-0">@pedidosPendentes</h3>
+                    <small class="text-muted">Aguardando separação / corte</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 bg-light">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold text-uppercase">Janela 12h (Almoço)</span>
+                    <h3 class="fw-bold text-success mt-1 mb-0">@pedidosJanela12h</h3>
+                    <small class="text-muted">Pedidos para entrega das 12h</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 bg-light">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold text-uppercase">Janela 19h (Noite)</span>
+                    <h3 class="fw-bold text-info mt-1 mb-0">@pedidosJanela19h</h3>
+                    <small class="text-muted">Pedidos para entrega das 19h</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 bg-light">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold text-uppercase">Títulos Vencidos</span>
+                    <h3 class="fw-bold text-danger mt-1 mb-0">R$ @totalVencido.ToString("N2")</h3>
+                    <small class="text-danger">@qtdTitulosVencidos título(s) em atraso</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEÇÃO PRINCIPAL -->
+    <div class="row g-4">
+        <!-- Últimos Pedidos -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0">Pedidos Recentes dos Vendedores</h5>
+                    <a href="pedidos" class="btn btn-sm btn-outline-secondary">Ver lista completa</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Cliente / Padaria</th>
+                                <th>Vendedor</th>
+                                <th>Janela</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!pedidosRecentes.Any())
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">
+                                        Nenhum pedido registrado no momento.
+                                    </td>
+                                </tr>
+                            }
+                            @foreach (var p in pedidosRecentes)
+                            {
+                                <tr>
+                                    <td class="fw-bold">#@p.Id</td>
+                                    <td>
+                                        <div class="fw-semibold">@(p.Cliente?.NomeFantasia ?? p.Cliente?.RazaoSocial ?? "Cliente")</div>
+                                        <small class="text-muted">Seq. Rota: @(p.Cliente?.SequenciaVisita)</small>
+                                    </td>
+                                    <td>@(p.Vendedor?.Nome ?? "Vendedor")</td>
+                                    <td>
+                                        <span class="badge @(p.JanelaEntrega == JanelaEntrega.H12 ? "bg-success" : "bg-info")">
+                                            @EntregaService.FormatarJanela(p.JanelaEntrega)
+                                        </span>
+                                    </td>
+                                    <td class="fw-semibold">R$ @p.ValorTotal.ToString("N2")</td>
+                                    <td>
+                                        <span class="badge @GetBadgeStatus(p.Status)">@p.Status</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="pedidos?id=@p.Id" class="btn btn-sm btn-outline-primary">
+                                            Detalhes
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas e Ações Rápidas -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0">⚡ Ações de Operação</h5>
+                </div>
+                <div class="card-body d-flex flex-column gap-2">
+                    <a href="corte" class="btn btn-outline-warning text-dark text-start p-3 rounded-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="fw-bold">Corte Proporcional</div>
+                            <small class="text-muted">Ajustar estoque excedente com IA</small>
+                        </div>
+                        <span class="fs-4">✂️</span>
+                    </a>
+                    <a href="vendas" class="btn btn-outline-primary text-start p-3 rounded-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="fw-bold">Faturar Pedidos</div>
+                            <small class="text-muted">Emitir nota fiscal e gerar contas a receber</small>
+                        </div>
+                        <span class="fs-4">🧾</span>
+                    </a>
+                    <a href="contas-receber" class="btn btn-outline-success text-start p-3 rounded-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="fw-bold">Baixa de Títulos</div>
+                            <small class="text-muted">Liquidacao com multa, juros e desconto</small>
+                        </div>
+                        <span class="fs-4">💰</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Resumo Financeiro -->
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0">📊 Resumo de Contas a Receber</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total a Receber:</span>
+                        <span class="fw-bold text-dark">R$ @totalAberto.ToString("N2")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Vencido:</span>
+                        <span class="fw-bold text-danger">R$ @totalVencido.ToString("N2")</span>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Condições Ativas:</span>
+                        <span class="badge bg-secondary">7/14d e 7/14/21d</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private int pedidosPendentes;
+    private int pedidosJanela12h;
+    private int pedidosJanela19h;
+    private decimal totalVencido;
+    private decimal totalAberto;
+    private int qtdTitulosVencidos;
+    private List<Pedido> pedidosRecentes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var pedidos = await Api.GetPedidosAsync();
+            pedidosPendentes = pedidos.Count(p => p.Status == StatusPedido.PENDENTE || p.Status == StatusPedido.CORTADO);
+            pedidosJanela12h = pedidos.Count(p => p.JanelaEntrega == JanelaEntrega.H12 && p.Status != StatusPedido.CANCELADO);
+            pedidosJanela19h = pedidos.Count(p => p.JanelaEntrega == JanelaEntrega.H19 && p.Status != StatusPedido.CANCELADO);
+            pedidosRecentes = pedidos.Take(6).ToList();
+
+            var contas = await Api.GetContasReceberAsync();
+            var agora = DateTime.UtcNow.Date;
+            var vencidas = contas.Where(c => c.Status == StatusContaReceber.VENCIDO || (c.Status == StatusContaReceber.ABERTO && c.DataVencimento.Date < agora)).ToList();
+            var abertas = contas.Where(c => c.Status == StatusContaReceber.ABERTO && c.DataVencimento.Date >= agora).ToList();
+
+            totalVencido = vencidas.Sum(c => c.ValorOriginal);
+            totalAberto = abertas.Sum(c => c.ValorOriginal);
+            qtdTitulosVencidos = vencidas.Count;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar dashboard: {ex.Message}");
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+
+    private string GetBadgeStatus(StatusPedido status) => status switch
+    {
+        StatusPedido.PENDENTE => "bg-warning text-dark",
+        StatusPedido.CORTADO => "bg-info text-dark",
+        StatusPedido.CONFIRMADO => "bg-primary",
+        StatusPedido.EM_SEPARACAO => "bg-secondary",
+        StatusPedido.ENVIADO => "bg-dark",
+        StatusPedido.ENTREGUE => "bg-success",
+        StatusPedido.CANCELADO => "bg-danger",
+        _ => "bg-light text-dark"
+    };
+}

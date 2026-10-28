@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VanderPan.Api/VanderPan.Api.csproj" />
+    <Project Path="src/VanderPan.App/VanderPan.App.csproj" />
+    <Project Path="src/VanderPan.Core/VanderPan.Core.csproj" />
+    <Project Path="src/VanderPan.Web/VanderPan.Web.csproj" />
+  </Folder>
+</Solution>

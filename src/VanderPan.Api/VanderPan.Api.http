@@ -1,0 +1,6 @@
+@VanderPan.Api_HostAddress = http://localhost:5296
+
+GET {{VanderPan.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,374 @@
+@page "/pedidos"
+@inject ApiService Api
+
+<PageTitle>Pedidos Recebidos - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Pedidos Recebidos</h2>
+        <p class="text-muted mb-0">Controle e triagem de pedidos agrupados por janela de entrega (12h e 19h)</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" @onclick="CarregarPedidos">
+            🔄 Atualizar
+        </button>
+        <a href="corte" class="btn btn-warning fw-semibold">
+            ✂️ Processar Corte de Estoque
+        </a>
+    </div>
+</div>
+
+<!-- FILTROS -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Janela de Entrega</label>
+                <select class="form-select" @bind="filtroJanela" @bind:after="Filtrar">
+                    <option value="">Todas as janelas (12h e 19h)</option>
+                    <option value="H12">Janela das 12h (Almoço)</option>
+                    <option value="H19">Janela das 19h (Noite)</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Status do Pedido</label>
+                <select class="form-select" @bind="filtroStatus" @bind:after="Filtrar">
+                    <option value="">Todos os status</option>
+                    @foreach (var s in StatusDisponiveis(pedidoSelecionado.Status))
+                    {
+                        <option value="@s">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Vendedor</label>
+                <select class="form-select" @bind="filtroVendedor" @bind:after="Filtrar">
+                    <option value="0">Todos os vendedores</option>
+                    @foreach (var v in vendedores)
+                    {
+                        <option value="@v.Id">@v.Nome</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (carregando)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else
+{
+    <!-- ABAS POR JANELA DE ENTREGA -->
+    <div class="row g-4">
+        <!-- JANELA 12H -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0">☀️ Janela 12h (@pedidos12h.Count pedidos)</h5>
+                    <span class="badge bg-white text-success">Total: R$ @pedidos12h.Sum(p => p.ValorTotal).ToString("N2")</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Cliente</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!pedidos12h.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            Nenhum pedido na janela das 12h.
+                                        </td>
+                                    </tr>
+                                }
+                                @foreach (var p in pedidos12h)
+                                {
+                                    <tr>
+                                        <td class="fw-bold">#@p.Id</td>
+                                        <td>
+                                            <div class="fw-semibold">@(p.Cliente?.NomeFantasia ?? p.Cliente?.RazaoSocial)</div>
+                                            <small class="text-muted">Vend: @(p.Vendedor?.Nome)</small>
+                                        </td>
+                                        <td class="fw-semibold">R$ @p.ValorTotal.ToString("N2")</td>
+                                        <td><span class="badge @GetBadgeStatus(p.Status)">@p.Status</span></td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => AbrirDetalhes(p)">
+                                                Ver
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JANELA 19H -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-info text-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0">🌙 Janela 19h (@pedidos19h.Count pedidos)</h5>
+                    <span class="badge bg-white text-info">Total: R$ @pedidos19h.Sum(p => p.ValorTotal).ToString("N2")</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Cliente</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!pedidos19h.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            Nenhum pedido na janela das 19h.
+                                        </td>
+                                    </tr>
+                                }
+                                @foreach (var p in pedidos19h)
+                                {
+                                    <tr>
+                                        <td class="fw-bold">#@p.Id</td>
+                                        <td>
+                                            <div class="fw-semibold">@(p.Cliente?.NomeFantasia ?? p.Cliente?.RazaoSocial)</div>
+                                            <small class="text-muted">Vend: @(p.Vendedor?.Nome)</small>
+                                        </td>
+                                        <td class="fw-semibold">R$ @p.ValorTotal.ToString("N2")</td>
+                                        <td><span class="badge @GetBadgeStatus(p.Status)">@p.Status</span></td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => AbrirDetalhes(p)">
+                                                Ver
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL DE DETALHES DO PEDIDO -->
+@if (pedidoSelecionado != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold">Detalhes do Pedido #@pedidoSelecionado.Id</h5>
+                    <button type="button" class="btn-close" @onclick="FecharDetalhes"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="text-muted small">Cliente:</label>
+                            <div class="fw-bold">@(pedidoSelecionado.Cliente?.RazaoSocial)</div>
+                            <small class="text-muted">CNPJ: @(pedidoSelecionado.Cliente?.Cnpj) | Rota Seq: @(pedidoSelecionado.Cliente?.SequenciaVisita)</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="text-muted small">Vendedor:</label>
+                            <div class="fw-semibold">@(pedidoSelecionado.Vendedor?.Nome)</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="text-muted small">Janela de Entrega:</label>
+                            <div>
+                                <span class="badge @(pedidoSelecionado.JanelaEntrega == JanelaEntrega.H12 ? "bg-success" : "bg-info") fs-6">
+                                    @EntregaService.FormatarJanela(pedidoSelecionado.JanelaEntrega)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(pedidoSelecionado.Observacao))
+                    {
+                        <div class="alert alert-secondary py-2 small mb-3">
+                            <strong>Obs:</strong> @pedidoSelecionado.Observacao
+                        </div>
+                    }
+
+                    <h6 class="fw-bold mt-3 mb-2">Itens Solicitados</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Produto</th>
+                                    <th class="text-center">Qtd Pedida</th>
+                                    <th class="text-center">Qtd Entregue (Corte)</th>
+                                    <th class="text-end">Preço Unit.</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in pedidoSelecionado.Itens)
+                                {
+                                    <tr>
+                                        <td>@(item.Produto?.Nome ?? "Produto")</td>
+                                        <td class="text-center">@item.QuantidadePedida</td>
+                                        <td class="text-center fw-bold text-primary">
+                                            @(item.QuantidadeEntregue ?? item.QuantidadePedida)
+                                        </td>
+                                        <td class="text-end">R$ @item.PrecoUnitario.ToString("N2")</td>
+                                        <td class="text-end fw-semibold">R$ @item.Subtotal.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-light">
+                                    <th colspan="4" class="text-end">Total do Pedido:</th>
+                                    <th class="text-end text-success fs-6">R$ @pedidoSelecionado.ValorTotal.ToString("N2")</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between mt-3 pt-3 border-top">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label small mb-0 fw-semibold">Alterar Status:</label>
+                            <select class="form-select form-select-sm w-auto" @bind="novoStatus">
+                                @foreach (var s in Enum.GetValues<StatusPedido>())
+                                {
+                                    <option value="@s">@s</option>
+                                }
+                            </select>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="AlterarStatusPedido">
+                                Salvar Status
+                            </button>
+                        </div>
+                        <a href="vendas?idPedido=@pedidoSelecionado.Id" class="btn btn-sm btn-success">
+                            🧾 Faturar / Gerar Venda
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<Pedido> todosPedidos = new();
+    private List<Pedido> pedidos12h = new();
+    private List<Pedido> pedidos19h = new();
+    private List<Vendedor> vendedores = new();
+
+    private string filtroJanela = "";
+    private string filtroStatus = "";
+    private int filtroVendedor = 0;
+
+    private Pedido? pedidoSelecionado;
+    private StatusPedido novoStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarPedidos();
+        vendedores = await Api.GetVendedoresAsync();
+    }
+
+    private async Task CarregarPedidos()
+    {
+        carregando = true;
+        todosPedidos = await Api.GetPedidosAsync();
+        Filtrar();
+        carregando = false;
+    }
+
+    private void Filtrar()
+    {
+        var lista = todosPedidos.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(filtroJanela) && Enum.TryParse<JanelaEntrega>(filtroJanela, out var j))
+        {
+            lista = lista.Where(p => p.JanelaEntrega == j);
+        }
+
+        if (!string.IsNullOrEmpty(filtroStatus) && Enum.TryParse<StatusPedido>(filtroStatus, out var s))
+        {
+            lista = lista.Where(p => p.Status == s);
+        }
+
+        if (filtroVendedor > 0)
+        {
+            lista = lista.Where(p => p.IdVendedor == filtroVendedor);
+        }
+
+        pedidos12h = lista.Where(p => p.JanelaEntrega == JanelaEntrega.H12).ToList();
+        pedidos19h = lista.Where(p => p.JanelaEntrega == JanelaEntrega.H19).ToList();
+    }
+
+    private void AbrirDetalhes(Pedido pedido)
+    {
+        pedidoSelecionado = pedido;
+        novoStatus = pedido.Status;
+    }
+
+    private void FecharDetalhes()
+    {
+        pedidoSelecionado = null;
+    }
+
+    private static IEnumerable<StatusPedido> StatusDisponiveis(StatusPedido status)
+    {
+        yield return status;
+        var proximo = status switch
+        {
+            StatusPedido.PENDENTE => StatusPedido.CORTADO,
+            StatusPedido.CORTADO => StatusPedido.CONFIRMADO,
+            StatusPedido.CONFIRMADO => StatusPedido.EM_SEPARACAO,
+            StatusPedido.EM_SEPARACAO => StatusPedido.ENVIADO,
+            StatusPedido.ENVIADO => StatusPedido.ENTREGUE,
+            _ => (StatusPedido?)null
+        };
+        if (proximo.HasValue) yield return proximo.Value;
+        if (status is StatusPedido.PENDENTE or StatusPedido.CORTADO or
+            StatusPedido.CONFIRMADO or StatusPedido.EM_SEPARACAO)
+        {
+            yield return StatusPedido.CANCELADO;
+        }
+    }
+
+    private async Task AlterarStatusPedido()
+    {
+        if (pedidoSelecionado == null) return;
+        var ok = await Api.AtualizarStatusPedidoAsync(pedidoSelecionado.Id, novoStatus);
+        if (ok)
+        {
+            pedidoSelecionado.Status = novoStatus;
+            await CarregarPedidos();
+            FecharDetalhes();
+        }
+    }
+
+    private string GetBadgeStatus(StatusPedido status) => status switch
+    {
+        StatusPedido.PENDENTE => "bg-warning text-dark",
+        StatusPedido.CORTADO => "bg-info text-dark",
+        StatusPedido.CONFIRMADO => "bg-primary",
+        StatusPedido.EM_SEPARACAO => "bg-secondary",
+        StatusPedido.ENVIADO => "bg-dark",
+        StatusPedido.ENTREGUE => "bg-success",
+        StatusPedido.CANCELADO => "bg-danger",
+        _ => "bg-light text-dark"
+    };
+}

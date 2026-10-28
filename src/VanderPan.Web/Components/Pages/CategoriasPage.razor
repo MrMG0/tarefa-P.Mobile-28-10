@@ -1,0 +1,131 @@
+@page "/categorias"
+@inject ApiService Api
+
+<PageTitle>Categorias - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Categorias de Produtos</h2>
+        <p class="text-muted mb-0">Agrupamento de itens de panificação e confeitaria</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" @onclick="AbrirModalNovo">
+        ➕ Nova Categoria
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Descrição</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (carregando)
+                {
+                    <tr>
+                        <td colspan="3" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </td>
+                    </tr>
+                }
+                else if (!categorias.Any())
+                {
+                    <tr>
+                        <td colspan="3" class="text-center py-4 text-muted">Nenhuma categoria cadastrada.</td>
+                    </tr>
+                }
+                @foreach (var c in categorias)
+                {
+                    <tr>
+                        <td class="fw-bold">@c.Nome</td>
+                        <td>@(c.Descricao ?? "-")</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => EditarCategoria(c)">✏️</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ExcluirCategoria(c.Id)">🗑️</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (exibirModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">@(categoriaEmEdicao.Id == 0 ? "Nova Categoria" : "Editar Categoria")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => exibirModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nome *</label>
+                        <input type="text" class="form-control" @bind="categoriaEmEdicao.Nome" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Descrição</label>
+                        <textarea class="form-control" rows="2" @bind="categoriaEmEdicao.Descricao"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => exibirModal = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary fw-bold" @onclick="SalvarCategoria">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<Categoria> categorias = new();
+    private bool exibirModal = false;
+    private Categoria categoriaEmEdicao = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarCategorias();
+    }
+
+    private async Task CarregarCategorias()
+    {
+        carregando = true;
+        categorias = await Api.GetCategoriasAsync();
+        carregando = false;
+    }
+
+    private void AbrirModalNovo()
+    {
+        categoriaEmEdicao = new Categoria();
+        exibirModal = true;
+    }
+
+    private void EditarCategoria(Categoria c)
+    {
+        categoriaEmEdicao = new Categoria { Id = c.Id, Nome = c.Nome, Descricao = c.Descricao, Ativo = c.Ativo };
+        exibirModal = true;
+    }
+
+    private async Task SalvarCategoria()
+    {
+        if (string.IsNullOrWhiteSpace(categoriaEmEdicao.Nome)) return;
+        var ok = await Api.SalvarCategoriaAsync(categoriaEmEdicao);
+        if (ok)
+        {
+            exibirModal = false;
+            await CarregarCategorias();
+        }
+    }
+
+    private async Task ExcluirCategoria(int id)
+    {
+        var ok = await Api.ExcluirCategoriaAsync(id);
+        if (ok) await CarregarCategorias();
+    }
+}

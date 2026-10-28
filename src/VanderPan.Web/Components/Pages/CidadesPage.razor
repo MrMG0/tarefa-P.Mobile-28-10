@@ -1,0 +1,139 @@
+@page "/cidades"
+@inject ApiService Api
+
+<PageTitle>Cidades - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Cidades Atendidas</h2>
+        <p class="text-muted mb-0">Cadastro de municípios para rotas de entrega</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" @onclick="AbrirModalNovo">
+        ➕ Nova Cidade
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome da Cidade</th>
+                    <th>Estado (UF)</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (carregando)
+                {
+                    <tr>
+                        <td colspan="3" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </td>
+                    </tr>
+                }
+                else if (!cidades.Any())
+                {
+                    <tr>
+                        <td colspan="3" class="text-center py-4 text-muted">Nenhuma cidade cadastrada.</td>
+                    </tr>
+                }
+                @foreach (var c in cidades)
+                {
+                    <tr>
+                        <td class="fw-bold">@c.Nome</td>
+                        <td>@(c.Estado?.Nome) - @(c.Estado?.Uf)</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => EditarCidade(c)">✏️</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ExcluirCidade(c.Id)">🗑️</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (exibirModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">@(cidadeEmEdicao.Id == 0 ? "Nova Cidade" : "Editar Cidade")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => exibirModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nome da Cidade *</label>
+                        <input type="text" class="form-control" @bind="cidadeEmEdicao.Nome" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Estado *</label>
+                        <select class="form-select" @bind="cidadeEmEdicao.IdEstado">
+                            <option value="0">-- Selecione o Estado --</option>
+                            @foreach (var e in estados)
+                            {
+                                <option value="@e.Id">@e.Nome (@e.Uf)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => exibirModal = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary fw-bold" @onclick="SalvarCidade">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<Cidade> cidades = new();
+    private List<Estado> estados = new();
+    private bool exibirModal = false;
+    private Cidade cidadeEmEdicao = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        estados = await Api.GetEstadosAsync();
+        await CarregarCidades();
+    }
+
+    private async Task CarregarCidades()
+    {
+        carregando = true;
+        cidades = await Api.GetCidadesAsync();
+        carregando = false;
+    }
+
+    private void AbrirModalNovo()
+    {
+        cidadeEmEdicao = new Cidade { IdEstado = estados.FirstOrDefault()?.Id ?? 0 };
+        exibirModal = true;
+    }
+
+    private void EditarCidade(Cidade c)
+    {
+        cidadeEmEdicao = new Cidade { Id = c.Id, Nome = c.Nome, IdEstado = c.IdEstado, Ativo = c.Ativo };
+        exibirModal = true;
+    }
+
+    private async Task SalvarCidade()
+    {
+        if (string.IsNullOrWhiteSpace(cidadeEmEdicao.Nome) || cidadeEmEdicao.IdEstado == 0) return;
+        var ok = await Api.SalvarCidadeAsync(cidadeEmEdicao);
+        if (ok)
+        {
+            exibirModal = false;
+            await CarregarCidades();
+        }
+    }
+
+    private async Task ExcluirCidade(int id)
+    {
+        var ok = await Api.ExcluirCidadeAsync(id);
+        if (ok) await CarregarCidades();
+    }
+}

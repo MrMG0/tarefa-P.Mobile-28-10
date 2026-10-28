@@ -1,0 +1,312 @@
+@page "/condicoes-pagamento"
+@inject ApiService Api
+
+<PageTitle>Condições de Pagamento - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Condições de Pagamento</h2>
+        <p class="text-muted mb-0">Parametrização de prazos, multas, juros diários, descontos por antecipação e formas de pagamento</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" @onclick="AbrirModalNovo">
+        ➕ Nova Condição
+    </button>
+</div>
+
+<!-- CARDS COM EXEMPLOS DO RASCUNHO -->
+<div class="row g-4 mb-4">
+    @if (carregando)
+    {
+        <div class="col-12 text-center py-4">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    }
+    @foreach (var c in condicoes)
+    {
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-primary me-2 fs-6">Código @c.Codigo</span>
+                        <strong class="text-dark fs-6">@c.Descricao</strong>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" @onclick="() => EditarCondicao(c)">✏️</button>
+                        <button class="btn btn-outline-danger" @onclick="() => ExcluirCondicao(c.Id)">🗑️</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3 text-center">
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded border">
+                                <small class="text-muted d-block">Multa Atraso</small>
+                                <strong class="text-danger">@c.MultaPercentual.ToString("N2")%</strong>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded border">
+                                <small class="text-muted d-block">Juros / Dia</small>
+                                <strong class="text-danger">@c.JurosDiaPercentual.ToString("N2")%</strong>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded border">
+                                <small class="text-muted d-block">Desc. Antecip.</small>
+                                <strong class="text-success">@c.DescontoDiaPercentual.ToString("N2")% ao dia</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold small text-uppercase text-muted mb-2">Composição de Parcelas:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center">Parcela</th>
+                                    <th>Prazo (Dias)</th>
+                                    <th>% do Valor</th>
+                                    <th>Forma de Pagamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in c.Parcelas.OrderBy(p => p.NumeroParcela))
+                                {
+                                    <tr>
+                                        <td class="text-center fw-bold">#@p.NumeroParcela</td>
+                                        <td>@p.DiasPrazo dias</td>
+                                        <td class="fw-semibold">@p.Percentual.ToString("N2")%</td>
+                                        <td><span class="badge bg-secondary">@p.FormaPagamento</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- MODAL CADASTRAR / EDITAR CONDIÇÃO DE PAGAMENTO -->
+@if (exibirModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">@(condicaoEmEdicao.Id == 0 ? "Nova Condição de Pagamento" : "Editar Condição")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => exibirModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Código *</label>
+                            <input type="text" class="form-control" @bind="condicaoEmEdicao.Codigo" placeholder="Ex: 10, 20..." required />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small fw-semibold">Descrição *</label>
+                            <input type="text" class="form-control" @bind="condicaoEmEdicao.Descricao" placeholder="Ex: 7/14 dias - Boleto Bancário" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Multa Fixa (%)</label>
+                            <input type="number" step="0.1" class="form-control" @bind="condicaoEmEdicao.MultaPercentual" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Juros por Dia (%)</label>
+                            <input type="number" step="0.1" class="form-control" @bind="condicaoEmEdicao.JurosDiaPercentual" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Desconto / Dia Antecipação (%)</label>
+                            <input type="number" step="0.1" class="form-control" @bind="condicaoEmEdicao.DescontoDiaPercentual" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+                        <h6 class="fw-bold mb-0">Parcelas da Condição</h6>
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AdicionarParcela">
+                            ➕ Adicionar Parcela
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center" style="width: 80px;">Nº</th>
+                                    <th>Dias de Prazo</th>
+                                    <th>Percentual (%)</th>
+                                    <th>Forma de Pagamento</th>
+                                    <th class="text-center" style="width: 50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in condicaoEmEdicao.Parcelas)
+                                {
+                                    <tr>
+                                        <td class="text-center fw-bold">@p.NumeroParcela</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm" @bind="p.DiasPrazo" />
+                                        </td>
+                                        <td>
+                                            <input type="number" step="0.01" class="form-control form-control-sm" @bind="p.Percentual" />
+                                        </td>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="p.FormaPagamento">
+                                                @foreach (var f in Enum.GetValues<FormaPagamento>())
+                                                {
+                                                    <option value="@f">@f</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoverParcela(p)">❌</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-light">
+                                    <th colspan="2" class="text-end">Soma dos Percentuais:</th>
+                                    <th class="fw-bold @(condicaoEmEdicao.Parcelas.Sum(p => p.Percentual) != 100 ? "text-danger" : "text-success")">
+                                        @condicaoEmEdicao.Parcelas.Sum(p => p.Percentual)%
+                                    </th>
+                                    <th colspan="2">
+                                        @(condicaoEmEdicao.Parcelas.Sum(p => p.Percentual) != 100 ? "(A soma deve ser 100%)" : "(Válido)")
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    @if (erro != null)
+                    {
+                        <div class="alert alert-danger py-2 small">@erro</div>
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => exibirModal = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary fw-bold" @onclick="SalvarCondicao">Salvar Condição</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<CondicaoPagamento> condicoes = new();
+
+    private bool exibirModal = false;
+    private CondicaoPagamento condicaoEmEdicao = new();
+    private string? erro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarCondicoes();
+    }
+
+    private async Task CarregarCondicoes()
+    {
+        carregando = true;
+        condicoes = await Api.GetCondicoesPagamentoAsync();
+        carregando = false;
+    }
+
+    private void AbrirModalNovo()
+    {
+        condicaoEmEdicao = new CondicaoPagamento
+        {
+            MultaPercentual = 5.00m,
+            JurosDiaPercentual = 2.00m,
+            DescontoDiaPercentual = 1.00m,
+            Parcelas = new List<ParcelaCondicao>
+            {
+                new() { NumeroParcela = 1, DiasPrazo = 7, Percentual = 50.00m, FormaPagamento = FormaPagamento.BOLETO },
+                new() { NumeroParcela = 2, DiasPrazo = 14, Percentual = 50.00m, FormaPagamento = FormaPagamento.BOLETO }
+            }
+        };
+        erro = null;
+        exibirModal = true;
+    }
+
+    private void EditarCondicao(CondicaoPagamento c)
+    {
+        condicaoEmEdicao = new CondicaoPagamento
+        {
+            Id = c.Id,
+            Codigo = c.Codigo,
+            Descricao = c.Descricao,
+            MultaPercentual = c.MultaPercentual,
+            JurosDiaPercentual = c.JurosDiaPercentual,
+            DescontoDiaPercentual = c.DescontoDiaPercentual,
+            Ativo = c.Ativo,
+            Parcelas = c.Parcelas.Select(p => new ParcelaCondicao
+            {
+                Id = p.Id,
+                IdCondicao = p.IdCondicao,
+                NumeroParcela = p.NumeroParcela,
+                DiasPrazo = p.DiasPrazo,
+                Percentual = p.Percentual,
+                FormaPagamento = p.FormaPagamento
+            }).ToList()
+        };
+        erro = null;
+        exibirModal = true;
+    }
+
+    private void AdicionarParcela()
+    {
+        var proxNumero = condicaoEmEdicao.Parcelas.Any() ? condicaoEmEdicao.Parcelas.Max(p => p.NumeroParcela) + 1 : 1;
+        var proxDias = condicaoEmEdicao.Parcelas.Any() ? condicaoEmEdicao.Parcelas.Max(p => p.DiasPrazo) + 7 : 7;
+        condicaoEmEdicao.Parcelas.Add(new ParcelaCondicao
+        {
+            NumeroParcela = proxNumero,
+            DiasPrazo = proxDias,
+            Percentual = 0m,
+            FormaPagamento = FormaPagamento.BOLETO
+        });
+    }
+
+    private void RemoverParcela(ParcelaCondicao p)
+    {
+        condicaoEmEdicao.Parcelas.Remove(p);
+        // Renumera
+        int i = 1;
+        foreach (var parc in condicaoEmEdicao.Parcelas.OrderBy(x => x.NumeroParcela))
+        {
+            parc.NumeroParcela = i++;
+        }
+    }
+
+    private async Task SalvarCondicao()
+    {
+        if (string.IsNullOrWhiteSpace(condicaoEmEdicao.Codigo) || string.IsNullOrWhiteSpace(condicaoEmEdicao.Descricao))
+        {
+            erro = "Preencha Código e Descrição.";
+            return;
+        }
+
+        if (!condicaoEmEdicao.Parcelas.Any())
+        {
+            erro = "Adicione ao menos uma parcela.";
+            return;
+        }
+
+        var ok = await Api.SalvarCondicaoPagamentoAsync(condicaoEmEdicao);
+        if (ok)
+        {
+            exibirModal = false;
+            await CarregarCondicoes();
+        }
+        else
+        {
+            erro = "Erro ao salvar condição de pagamento.";
+        }
+    }
+
+    private async Task ExcluirCondicao(int id)
+    {
+        var ok = await Api.ExcluirCondicaoPagamentoAsync(id);
+        if (ok) await CarregarCondicoes();
+    }
+}

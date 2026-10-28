@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:dtos="clr-namespace:VanderPan.Core.DTOs;assembly=VanderPan.Core"
+             xmlns:models="clr-namespace:VanderPan.Core.Models;assembly=VanderPan.Core"
+             x:Class="VanderPan.App.Views.ClienteDetalhesPage"
+             Title="Detalhes do Cliente"
+             BackgroundColor="#FAF8F5">
+
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="16" Spacing="16">
+                
+                <!-- DADOS CADASTRAIS -->
+                <Frame BackgroundColor="White" CornerRadius="12" Padding="16" HasShadow="True">
+                    <VerticalStackLayout Spacing="6">
+                        <Label x:Name="RazaoSocialLabel" FontSize="18" FontAttributes="Bold" TextColor="#1F2937" />
+                        <Label x:Name="NomeFantasiaLabel" FontSize="14" TextColor="#4B5563" />
+                        <Label x:Name="CnpjLabel" FontSize="12" TextColor="#9CA3AF" />
+                        <Label x:Name="EnderecoLabel" FontSize="13" TextColor="#6B7280" />
+                        <Label x:Name="TelefoneLabel" FontSize="13" TextColor="#6B7280" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- DÉBITOS PENDENTES (RF06 / RN04) -->
+                <Frame BackgroundColor="White" CornerRadius="12" Padding="16" HasShadow="True">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="💰 Posição Financeira / Débitos" FontSize="16" FontAttributes="Bold" TextColor="#1F2937" />
+
+                        <Grid ColumnDefinitions="*,*">
+                            <Frame Grid.Column="0" BackgroundColor="#FEF2F2" BorderColor="#EF4444" CornerRadius="8" Padding="10" Margin="0,0,4,0">
+                                <VerticalStackLayout HorizontalOptions="Center">
+                                    <Label Text="VENCIDO" FontSize="11" FontAttributes="Bold" TextColor="#DC2626" />
+                                    <Label x:Name="TotalVencidoLabel" Text="R$ 0,00" FontSize="16" FontAttributes="Bold" TextColor="#991B1B" />
+                                </VerticalStackLayout>
+                            </Frame>
+
+                            <Frame Grid.Column="1" BackgroundColor="#F3F4F6" BorderColor="#D1D5DB" CornerRadius="8" Padding="10" Margin="4,0,0,0">
+                                <VerticalStackLayout HorizontalOptions="Center">
+                                    <Label Text="A VENCER" FontSize="11" FontAttributes="Bold" TextColor="#4B5563" />
+                                    <Label x:Name="TotalAbertoLabel" Text="R$ 0,00" FontSize="16" FontAttributes="Bold" TextColor="#1F2937" />
+                                </VerticalStackLayout>
+                            </Frame>
+                        </Grid>
+
+                        <Label x:Name="AlertaDebitoLabel" Text="⚠️ Cliente possui pendências financeiras. Negocie antes de emitir novos pedidos!" 
+                               TextColor="#DC2626" FontSize="12" FontAttributes="Bold" IsVisible="False" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- HISTÓRICO DE COMPRAS (ÚLTIMA COMPRA) (RF05 / RN05) -->
+                <Frame BackgroundColor="White" CornerRadius="12" Padding="16" HasShadow="True">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="📜 Produtos da Última Compra" FontSize="16" FontAttributes="Bold" TextColor="#1F2937" />
+                        <Label Text="Quantidades e preços praticados nas compras anteriores:" FontSize="12" TextColor="#6B7280" />
+
+                        <VerticalStackLayout x:Name="HistoricoContainer" Spacing="8">
+                            <Label x:Name="SemHistoricoLabel" Text="Nenhuma compra registrada anteriormente." FontSize="13" TextColor="#9CA3AF" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Frame>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- BOTÃO INICIAR NOVO PEDIDO -->
+        <Frame Grid.Row="1" BackgroundColor="White" CornerRadius="0" Padding="16,12" HasShadow="True" BorderColor="#E5E7EB">
+            <Button Text="🛒 Iniciar Pedido para este Cliente" 
+                    BackgroundColor="#D97706" TextColor="White" FontAttributes="Bold" CornerRadius="10" HeightRequest="48"
+                    Clicked="OnIniciarPedidoClicked" />
+        </Frame>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,274 @@
+@page "/produtos"
+@inject ApiService Api
+
+<PageTitle>Produtos de Panificação - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Catálogo de Produtos</h2>
+        <p class="text-muted mb-0">Produtos perecíveis, leveduras, misturas e matérias-primas de panificação</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" @onclick="AbrirModalNovo">
+        ➕ Cadastrar Produto
+    </button>
+</div>
+
+<!-- FILTROS -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Categoria</label>
+                <select class="form-select" @bind="filtroCategoria" @bind:after="CarregarProdutos">
+                    <option value="0">Todas as Categorias</option>
+                    @foreach (var cat in categorias)
+                    {
+                        <option value="@cat.Id">@cat.Nome</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <div class="text-end w-100 text-muted">
+                    Total de Itens Cadastrados: <strong class="text-dark">@produtos.Count</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABELA DE PRODUTOS -->
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome do Produto</th>
+                    <th>Categoria</th>
+                    <th>Preço Unitário</th>
+                    <th>Estoque Galpão</th>
+                    <th>Unidade</th>
+                    <th>Perecível</th>
+                    <th>Status</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (carregando)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </td>
+                    </tr>
+                }
+                else if (!produtos.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            Nenhum produto cadastrado.
+                        </td>
+                    </tr>
+                }
+                @foreach (var p in produtos)
+                {
+                    <tr>
+                        <td>
+                            <div class="fw-bold">@p.Nome</div>
+                            <small class="text-muted">@p.Descricao</small>
+                        </td>
+                        <td>@(p.Categoria?.Nome ?? "-")</td>
+                        <td class="fw-bold fs-6">R$ @p.Preco.ToString("N2")</td>
+                        <td>
+                            <span class="badge @(p.Estoque <= 20 ? "bg-warning text-dark" : "bg-light text-dark border") fs-6">
+                                @p.Estoque.ToString("N3")
+                            </span>
+                        </td>
+                        <td><span class="badge bg-secondary">@p.UnidadeMedida</span></td>
+                        <td>
+                            <span class="badge @(p.Perecivel ? "bg-danger" : "bg-light text-muted border")">
+                                @(p.Perecivel ? "PERECÍVEL" : "NÃO")
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @(p.Disponivel ? "bg-success" : "bg-secondary")">
+                                @(p.Disponivel ? "DISPONÍVEL" : "INDISPONÍVEL")
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" @onclick="() => EditarProduto(p)">
+                                    ✏️
+                                </button>
+                                <button class="btn btn-outline-danger" @onclick="() => ExcluirProduto(p.Id)">
+                                    🗑️
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL CADASTRAR / EDITAR PRODUTO -->
+@if (exibirModalCadastro)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">@(produtoEmEdicao.Id == 0 ? "Novo Produto" : "Editar Produto")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => exibirModalCadastro = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-semibold">Nome do Produto *</label>
+                            <input type="text" class="form-control" @bind="produtoEmEdicao.Nome" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Categoria *</label>
+                            <select class="form-select" @bind="produtoEmEdicao.IdCategoria">
+                                <option value="0">-- Selecione --</option>
+                                @foreach (var cat in categorias)
+                                {
+                                    <option value="@cat.Id">@cat.Nome</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Descrição Técnica</label>
+                            <textarea class="form-control" rows="2" @bind="produtoEmEdicao.Descricao"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Preço Unitário (R$) *</label>
+                            <input type="number" step="0.01" class="form-control" @bind="produtoEmEdicao.Preco" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Estoque no Galpão *</label>
+                            <input type="number" step="0.001" class="form-control" @bind="produtoEmEdicao.Estoque" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Unidade de Medida</label>
+                            <select class="form-select" @bind="produtoEmEdicao.UnidadeMedida">
+                                @foreach (var u in Enum.GetValues<UnidadeMedida>())
+                                {
+                                    <option value="@u">@u</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="chkPerecivel" @bind="produtoEmEdicao.Perecivel" />
+                                <label class="form-check-label fw-semibold" for="chkPerecivel">
+                                    Produto Perecível (Exige controle especial de data/temperatura)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="chkDisp" @bind="produtoEmEdicao.Disponivel" />
+                                <label class="form-check-label fw-semibold" for="chkDisp">
+                                    Disponível para Venda
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (erroCadastro != null)
+                    {
+                        <div class="alert alert-danger py-2 mt-3 small">@erroCadastro</div>
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => exibirModalCadastro = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary fw-bold" @onclick="SalvarProduto">Salvar Produto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<Produto> produtos = new();
+    private List<Categoria> categorias = new();
+
+    private int filtroCategoria = 0;
+
+    private bool exibirModalCadastro = false;
+    private Produto produtoEmEdicao = new();
+    private string? erroCadastro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categorias = await Api.GetCategoriasAsync();
+        await CarregarProdutos();
+    }
+
+    private async Task CarregarProdutos()
+    {
+        carregando = true;
+        produtos = await Api.GetProdutosAsync(filtroCategoria > 0 ? filtroCategoria : null, apenasDisponiveis: false);
+        carregando = false;
+    }
+
+    private void AbrirModalNovo()
+    {
+        produtoEmEdicao = new Produto
+        {
+            IdCategoria = categorias.FirstOrDefault()?.Id ?? 0,
+            UnidadeMedida = UnidadeMedida.UNIDADE,
+            Perecivel = true,
+            Disponivel = true
+        };
+        erroCadastro = null;
+        exibirModalCadastro = true;
+    }
+
+    private void EditarProduto(Produto p)
+    {
+        produtoEmEdicao = new Produto
+        {
+            Id = p.Id,
+            Nome = p.Nome,
+            Descricao = p.Descricao,
+            Preco = p.Preco,
+            IdCategoria = p.IdCategoria,
+            Estoque = p.Estoque,
+            UnidadeMedida = p.UnidadeMedida,
+            Perecivel = p.Perecivel,
+            Disponivel = p.Disponivel,
+            Ativo = p.Ativo
+        };
+        erroCadastro = null;
+        exibirModalCadastro = true;
+    }
+
+    private async Task SalvarProduto()
+    {
+        if (string.IsNullOrWhiteSpace(produtoEmEdicao.Nome) || produtoEmEdicao.IdCategoria == 0 || produtoEmEdicao.Preco <= 0)
+        {
+            erroCadastro = "Preencha Nome, Categoria e Preço válido.";
+            return;
+        }
+
+        var ok = await Api.SalvarProdutoAsync(produtoEmEdicao);
+        if (ok)
+        {
+            exibirModalCadastro = false;
+            await CarregarProdutos();
+        }
+        else
+        {
+            erroCadastro = "Erro ao salvar produto.";
+        }
+    }
+
+    private async Task ExcluirProduto(int id)
+    {
+        var ok = await Api.ExcluirProdutoAsync(id);
+        if (ok) await CarregarProdutos();
+    }
+}

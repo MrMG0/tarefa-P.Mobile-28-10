@@ -1,0 +1,315 @@
+@page "/vendas"
+@inject ApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>Vendas & Faturamento - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Vendas & Faturamento</h2>
+        <p class="text-muted mb-0">Emissão de notas fiscais e geração automática de parcelas de contas a receber</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" @onclick="AbrirModalFaturamento">
+        ➕ Faturar Pedido Confirmado / Cortado
+    </button>
+</div>
+
+<!-- LISTA DE VENDAS REALIZADAS -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="fw-bold mb-0">Histórico de Vendas Faturadas</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>NF</th>
+                    <th>Data Venda</th>
+                    <th>Cliente / Padaria</th>
+                    <th>Vendedor</th>
+                    <th>Condição de Pagamento</th>
+                    <th>Valor Total</th>
+                    <th>Parcelas</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (carregando)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </td>
+                    </tr>
+                }
+                else if (!vendas.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            Nenhuma venda faturada encontrada.
+                        </td>
+                    </tr>
+                }
+                @foreach (var v in vendas)
+                {
+                    <tr>
+                        <td class="fw-bold text-primary">NF #@v.NumeroNota</td>
+                        <td>@v.DataVenda.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            <div class="fw-semibold">@(v.Cliente?.RazaoSocial)</div>
+                            <small class="text-muted">CNPJ: @(v.Cliente?.Cnpj)</small>
+                        </td>
+                        <td>@(v.Vendedor?.Nome)</td>
+                        <td>
+                            <span class="badge bg-secondary">
+                                @(v.Condicao?.Codigo) - @(v.Condicao?.Descricao)
+                            </span>
+                        </td>
+                        <td class="fw-bold fs-6 text-dark">R$ @v.ValorTotal.ToString("N2")</td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                @v.ContasReceber.Count parcela(s)
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-info" @onclick="() => VerDetalhesVenda(v)">
+                                Ver Títulos
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL PARA FATURAR PEDIDO (CONVERTER PEDIDO EM VENDA) -->
+@if (exibirModalFaturamento)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">🧾 Faturar Pedido (Gerar Venda)</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => exibirModalFaturamento = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Selecione o Pedido:</label>
+                        <select class="form-select" @bind="idPedidoSelecionado" @bind:after="AtualizarPreviewPedido">
+                            <option value="0">-- Selecione um pedido pronto para faturar --</option>
+                            @foreach (var p in pedidosProntos)
+                            {
+                                <option value="@p.Id">
+                                    Pedido #@p.Id - @(p.Cliente?.NomeFantasia ?? p.Cliente?.RazaoSocial) - R$ @p.ValorTotal.ToString("N2") (@p.Status)
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    @if (pedidoPreview != null)
+                    {
+                        <div class="p-3 bg-light rounded-3 mb-3 border">
+                            <div class="row g-2 small">
+                                <div class="col-md-6"><strong>Cliente:</strong> @pedidoPreview.Cliente?.RazaoSocial</div>
+                                <div class="col-md-6"><strong>Vendedor:</strong> @pedidoPreview.Vendedor?.Nome</div>
+                                <div class="col-md-6"><strong>Janela:</strong> @EntregaService.FormatarJanela(pedidoPreview.JanelaEntrega)</div>
+                                <div class="col-md-6 text-success fw-bold"><strong>Total dos Itens:</strong> R$ @pedidoPreview.ValorTotal.ToString("N2")</div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Número da Nota Fiscal (NF):</label>
+                                <input type="text" class="form-control" placeholder="Ex: 123" @bind="numeroNota" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Condição de Pagamento:</label>
+                                <select class="form-select" @bind="idCondicaoSelecionada">
+                                    <option value="0">-- Selecione a condição --</option>
+                                    @foreach (var c in condicoes)
+                                    {
+                                        <option value="@c.Id">@c.Codigo - @c.Descricao</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        @if (erroFaturamento != null)
+                        {
+                            <div class="alert alert-danger py-2 mt-3 small">
+                                @erroFaturamento
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => exibirModalFaturamento = false">Cancelar</button>
+                    <button type="button" class="btn btn-success fw-bold" @onclick="ConfirmarFaturamento" disabled="@(pedidoPreview == null || processandoFaturamento)">
+                        @if (processandoFaturamento)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Faturando...</span>
+                        }
+                        else
+                        {
+                            <span>Confirmar e Gerar Contas a Receber</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL DETALHES DE VENDAS E TÍTULOS GERADOS -->
+@if (vendaDetalhe != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold">Venda NF #@vendaDetalhe.NumeroNota</h5>
+                    <button type="button" class="btn-close" @onclick="() => vendaDetalhe = null"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="text-muted small">Cliente:</label>
+                            <div class="fw-bold">@vendaDetalhe.Cliente?.RazaoSocial</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="text-muted small">Data Venda:</label>
+                            <div>@vendaDetalhe.DataVenda.ToString("dd/MM/yyyy")</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="text-muted small">Total:</label>
+                            <div class="fw-bold text-success fs-6">R$ @vendaDetalhe.ValorTotal.ToString("N2")</div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold mt-4 mb-2">Títulos de Contas a Receber Gerados</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Parcela</th>
+                                    <th>Vencimento</th>
+                                    <th>Forma Pgto</th>
+                                    <th>Valor Original</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in vendaDetalhe.ContasReceber)
+                                {
+                                    <tr>
+                                        <td class="fw-bold text-primary">@c.NumeroDocumento</td>
+                                        <td>Parcela @c.NumeroParcela</td>
+                                        <td>@c.DataVencimento.ToString("dd/MM/yyyy")</td>
+                                        <td><span class="badge bg-secondary">@c.FormaPagamento</span></td>
+                                        <td class="fw-semibold">R$ @c.ValorOriginal.ToString("N2")</td>
+                                        <td><span class="badge @(c.Status == StatusContaReceber.PAGO ? "bg-success" : (c.Status == StatusContaReceber.VENCIDO ? "bg-danger" : "bg-warning text-dark"))">@c.Status</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <a href="contas-receber" class="btn btn-sm btn-outline-success">Ir para Contas a Receber</a>
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => vendaDetalhe = null">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public int? IdPedido { get; set; }
+
+    private bool carregando = true;
+    private List<Venda> vendas = new();
+    private List<Pedido> pedidosProntos = new();
+    private List<CondicaoPagamento> condicoes = new();
+
+    private bool exibirModalFaturamento = false;
+    private int idPedidoSelecionado = 0;
+    private Pedido? pedidoPreview;
+    private string numeroNota = "";
+    private int idCondicaoSelecionada = 0;
+    private bool processandoFaturamento = false;
+    private string? erroFaturamento;
+
+    private Venda? vendaDetalhe;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+
+        if (IdPedido.HasValue && IdPedido.Value > 0)
+        {
+            idPedidoSelecionado = IdPedido.Value;
+            AtualizarPreviewPedido();
+            exibirModalFaturamento = true;
+        }
+    }
+
+    private async Task CarregarDados()
+    {
+        carregando = true;
+        vendas = await Api.GetVendasAsync();
+        var todosPedidos = await Api.GetPedidosAsync();
+        pedidosProntos = todosPedidos
+            .Where(p => p.Status == StatusPedido.CORTADO || p.Status == StatusPedido.CONFIRMADO)
+            .ToList();
+        condicoes = await Api.GetCondicoesPagamentoAsync();
+        carregando = false;
+    }
+
+    private void AbrirModalFaturamento()
+    {
+        erroFaturamento = null;
+        numeroNota = (new Random().Next(100, 999)).ToString();
+        idCondicaoSelecionada = condicoes.FirstOrDefault()?.Id ?? 0;
+        exibirModalFaturamento = true;
+    }
+
+    private void AtualizarPreviewPedido()
+    {
+        pedidoPreview = pedidosProntos.FirstOrDefault(p => p.Id == idPedidoSelecionado);
+    }
+
+    private async Task ConfirmarFaturamento()
+    {
+        if (idPedidoSelecionado == 0 || string.IsNullOrWhiteSpace(numeroNota) || idCondicaoSelecionada == 0)
+        {
+            erroFaturamento = "Por favor preencha todos os campos obrigatórios.";
+            return;
+        }
+
+        processandoFaturamento = true;
+        erroFaturamento = null;
+
+        var novaVenda = await Api.GerarVendaAsync(idPedidoSelecionado, idCondicaoSelecionada, numeroNota);
+        processandoFaturamento = false;
+
+        if (novaVenda != null)
+        {
+            exibirModalFaturamento = false;
+            await CarregarDados();
+            vendaDetalhe = novaVenda;
+        }
+        else
+        {
+            erroFaturamento = "Não foi possível gerar a venda. Verifique os dados.";
+        }
+    }
+
+    private void VerDetalhesVenda(Venda venda)
+    {
+        vendaDetalhe = venda;
+    }
+}

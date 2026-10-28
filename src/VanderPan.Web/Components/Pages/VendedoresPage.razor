@@ -1,0 +1,268 @@
+@page "/vendedores"
+@inject ApiService Api
+
+<PageTitle>Vendedores - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Equipe de Vendedores</h2>
+        <p class="text-muted mb-0">Gestão de vendedores externos e suas respectivas carteiras de padarias</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" @onclick="AbrirModalNovo">
+        ➕ Cadastrar Vendedor
+    </button>
+</div>
+
+<!-- LISTA DE VENDEDORES -->
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>E-mail</th>
+                    <th>Telefone</th>
+                    <th>CPF</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (carregando)
+                {
+                    <tr>
+                        <td colspan="5" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </td>
+                    </tr>
+                }
+                else if (!vendedores.Any())
+                {
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            Nenhum vendedor cadastrado.
+                        </td>
+                    </tr>
+                }
+                @foreach (var v in vendedores)
+                {
+                    <tr>
+                        <td class="fw-bold">@v.Nome</td>
+                        <td>@v.Email</td>
+                        <td>@(v.Telefone ?? "-")</td>
+                        <td>@v.Cpf</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" @onclick="() => VerCarteira(v)">
+                                    💼 Carteira de Clientes
+                                </button>
+                                <button class="btn btn-outline-secondary" @onclick="() => EditarVendedor(v)">
+                                    ✏️
+                                </button>
+                                <button class="btn btn-outline-danger" @onclick="() => ExcluirVendedor(v.Id)">
+                                    🗑️
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL CADASTRAR / EDITAR VENDEDOR -->
+@if (exibirModalCadastro)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">@(vendedorEmEdicao.Id == 0 ? "Novo Vendedor" : "Editar Vendedor")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => exibirModalCadastro = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nome Completo *</label>
+                        <input type="text" class="form-control" @bind="vendedorEmEdicao.Nome" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">E-mail *</label>
+                        <input type="email" class="form-control" @bind="vendedorEmEdicao.Email" required />
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">CPF *</label>
+                            <input type="text" class="form-control" @bind="vendedorEmEdicao.Cpf" placeholder="000.000.000-00" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Telefone</label>
+                            <input type="text" class="form-control" @bind="vendedorEmEdicao.Telefone" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Senha @(vendedorEmEdicao.Id == 0 ? "*" : "(Deixe em branco para manter)")</label>
+                        <input type="password" class="form-control" @bind="senhaDigitada" />
+                    </div>
+
+                    @if (erroCadastro != null)
+                    {
+                        <div class="alert alert-danger py-2 small">@erroCadastro</div>
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => exibirModalCadastro = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary fw-bold" @onclick="SalvarVendedor">Salvar Vendedor</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL CARTEIRA DE CLIENTES DO VENDEDOR -->
+@if (carteiraVendedor != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">Carteira de Clientes: @vendedorCarteiraNome</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => carteiraVendedor = null"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Roteiro de visitas ordenado pela sequência de atendimento cadastrada:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center">Seq. Visita</th>
+                                    <th>Razão Social / Nome Fantasia</th>
+                                    <th>CNPJ</th>
+                                    <th>Endereço</th>
+                                    <th>Telefone</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!carteiraVendedor.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center py-3 text-muted">
+                                            Nenhum cliente atribuído a este vendedor.
+                                        </td>
+                                    </tr>
+                                }
+                                @foreach (var c in carteiraVendedor)
+                                {
+                                    <tr>
+                                        <td class="text-center">
+                                            <span class="badge bg-dark fs-6">@c.SequenciaVisita</span>
+                                        </td>
+                                        <td class="fw-bold">@c.RazaoSocial</td>
+                                        <td>@c.Cnpj</td>
+                                        <td>@(c.Rua), @(c.Numero) - @(c.Bairro) (@(c.Cidade?.Nome))</td>
+                                        <td>@(c.Telefone ?? "-")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => carteiraVendedor = null">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<Vendedor> vendedores = new();
+
+    private bool exibirModalCadastro = false;
+    private Vendedor vendedorEmEdicao = new();
+    private string senhaDigitada = "";
+    private string? erroCadastro;
+
+    private List<Cliente>? carteiraVendedor;
+    private string vendedorCarteiraNome = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarVendedores();
+    }
+
+    private async Task CarregarVendedores()
+    {
+        carregando = true;
+        vendedores = await Api.GetVendedoresAsync();
+        carregando = false;
+    }
+
+    private void AbrirModalNovo()
+    {
+        vendedorEmEdicao = new Vendedor();
+        senhaDigitada = "123456";
+        erroCadastro = null;
+        exibirModalCadastro = true;
+    }
+
+    private void EditarVendedor(Vendedor v)
+    {
+        vendedorEmEdicao = new Vendedor
+        {
+            Id = v.Id,
+            Nome = v.Nome,
+            Email = v.Email,
+            Telefone = v.Telefone,
+            Cpf = v.Cpf,
+            SenhaHash = v.SenhaHash,
+            Ativo = v.Ativo
+        };
+        senhaDigitada = "";
+        erroCadastro = null;
+        exibirModalCadastro = true;
+    }
+
+    private async Task SalvarVendedor()
+    {
+        if (string.IsNullOrWhiteSpace(vendedorEmEdicao.Nome) || string.IsNullOrWhiteSpace(vendedorEmEdicao.Email) || string.IsNullOrWhiteSpace(vendedorEmEdicao.Cpf))
+        {
+            erroCadastro = "Preencha Nome, E-mail e CPF.";
+            return;
+        }
+
+        if (vendedorEmEdicao.Id == 0 && string.IsNullOrWhiteSpace(senhaDigitada))
+        {
+            erroCadastro = "Senha é obrigatória para novo vendedor.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(senhaDigitada))
+        {
+            vendedorEmEdicao.SenhaHash = senhaDigitada;
+        }
+
+        var ok = await Api.SalvarVendedorAsync(vendedorEmEdicao);
+        if (ok)
+        {
+            exibirModalCadastro = false;
+            await CarregarVendedores();
+        }
+        else
+        {
+            erroCadastro = "Erro ao salvar. Verifique se e-mail ou CPF já existem.";
+        }
+    }
+
+    private async Task ExcluirVendedor(int id)
+    {
+        var ok = await Api.ExcluirVendedorAsync(id);
+        if (ok) await CarregarVendedores();
+    }
+
+    private async Task VerCarteira(Vendedor v)
+    {
+        vendedorCarteiraNome = v.Nome;
+        carteiraVendedor = await Api.GetCarteiraVendedorAsync(v.Id);
+    }
+}

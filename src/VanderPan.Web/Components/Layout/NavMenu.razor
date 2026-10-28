@@ -1,0 +1,84 @@
+<div class="top-row ps-3 navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold text-warning" href="">🥐 VanderPan</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column py-2">
+        <div class="px-3 pt-2 pb-1 text-uppercase text-muted small fw-semibold">Geral</div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                📊 Dashboard
+            </NavLink>
+        </div>
+
+        <div class="px-3 pt-3 pb-1 text-uppercase text-muted small fw-semibold">Operações</div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="pedidos">
+                📦 Pedidos Recebidos
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="corte">
+                ✂️ Corte de Pedidos
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="vendas">
+                🧾 Vendas
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="contas-receber">
+                💰 Contas a Receber
+            </NavLink>
+        </div>
+
+        <div class="px-3 pt-3 pb-1 text-uppercase text-muted small fw-semibold">Cadastros</div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="clientes">
+                🏬 Clientes (Padarias)
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="vendedores">
+                👔 Vendedores
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="produtos">
+                🥖 Produtos
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="categorias">
+                🏷️ Categorias
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="condicoes-pagamento">
+                💳 Condições Pgto
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="cidades">
+                🏙️ Cidades
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="estados">
+                🗺️ Estados
+            </NavLink>
+        </div>
+
+        <div class="px-3 pt-3 pb-1 text-uppercase text-muted small fw-semibold">Gestão</div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="relatorios">
+                📈 Relatórios
+            </NavLink>
+        </div>
+    </nav>
+</div>

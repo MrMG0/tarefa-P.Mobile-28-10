@@ -1,0 +1,1062 @@
+================================================================================
+             ESPECIFICAÇÃO DO PROJETO - VANDERPAN
+      Sistema de Distribuição de Produtos de Panificação
+                      Trabalho Acadêmico
+================================================================================
+
+
+================================================================================
+1. OBJETIVO DO PROJETO
+================================================================================
+
+Desenvolver um sistema completo para uma distribuidora de produtos de
+panificação, composto por três frentes:
+
+  - Um APLICATIVO MOBILE (VanderPan App) para uso dos VENDEDORES externos,
+    destinado a visitar clientes, registrar pedidos de venda, consultar
+    carteira de clientes, roteiro de visitas, histórico de compras e
+    débitos pendentes.
+
+  - Um SITE WEB (VanderPan Web) para uso da DISTRIBUIDORA (administração),
+    onde se gerenciam cadastros (clientes, cidades, estados, produtos,
+    categorias, vendedores, condições de pagamento), se recebem e processam
+    os pedidos dos vendedores (incluindo corte de pedidos por estoque),
+    se controlam vendas, contas a receber e entregas.
+
+  - Uma API RESTful central que conecta ambas as plataformas ao banco de
+    dados, gerencia toda a lógica de negócio, produtos, clientes, pedidos,
+    vendas, contas a receber e condições de pagamento.
+
+O sistema INCLUI controle financeiro de contas a receber, com cálculo
+automático de multa, juros e desconto, além de parcelamento via condições
+de pagamento configuráveis.
+
+Projeto desenvolvido como trabalho acadêmico.
+
+
+================================================================================
+2. INFRAESTRUTURA E ARQUITETURA
+================================================================================
+
+  ┌──────────────────────────────────────┐
+  │  CELULAR (.NET MAUI)                 │
+  │  Uso: VENDEDOR EXTERNO               │
+  │  ┌───────────┬──────────────────┐    │
+  │  │ Carteira  │ Pedidos de Venda │    │
+  │  │ Clientes  │ Roteiro Visitas  │    │
+  │  │ Histórico │ Débitos Cliente  │    │
+  │  └───────────┴──────────────────┘    │
+  │  (sem banco local – consome API)     │
+  └──────────────────┬───────────────────┘
+                     │ HTTPS
+                     ▼
+  ┌──────────────────────────────┐           ┌──────────────────┐
+  │     API (.NET Core)                   │◄─────► │     MySQL (BD)         │
+  │     Web Service REST                  │           │     Servidor           │
+  └──────────────────▲───────────┘           └──────────────────┘
+                     │ HTTPS
+  ┌──────────────────┴───────────────────┐
+  │  SITE WEB / PAINEL ADMINISTRATIVO    │
+  │  Uso: DISTRIBUIDORA (gestão)         │
+  │  ┌───────────┬──────────────────┐    │
+  │  │ Cadastros │ Corte Pedidos    │    │
+  │  │ Vendas    │ Contas Receber   │    │
+  │  │ Entregas  │ Vendedores       │    │
+  │  └───────────┴──────────────────┘    │
+  └──────────────────────────────────────┘
+
+
+================================================================================
+3. FERRAMENTAS E TECNOLOGIAS
+================================================================================
+
+3.1. Aplicativo Mobile - VanderPan App (Uso: Vendedor Externo)
+  - Linguagem/Framework: C# com .NET MAUI
+  - Sem banco de dados local (consome API diretamente)
+  - IDE: Visual Studio Code
+  - Plataforma alvo: Android
+
+3.2. API / Web Service (Backend)
+  - Linguagem/Framework: C# com ASP.NET Core (Web API)
+  - Banco de dados: MySQL (servidor)
+  - IDE: Visual Studio Code
+
+3.3. Site Web - VanderPan Web (Uso: Administração da Distribuidora)
+  - Frontend consumindo a mesma API REST
+  - Tecnologia web a definir (Blazor, HTML/CSS/JS ou framework JS)
+  - IDE: Visual Studio Code
+
+3.4. Controle de Versão
+  - Git / GitHub (conta dedicada para o projeto)
+
+3.5. Ferramenta de Apoio ao Desenvolvimento
+  - Claude pelo Antigravity para iniciar a documentação e a base do projeto
+  - Gemini integrado ao Visual Studio Code para ajustes no projeto
+
+3.6. Segurança / Criptografia
+  - Comunicação via HTTPS (TLS) entre cliente e API
+  - Senhas armazenadas com hash (bcrypt ou SHA-256)
+
+
+================================================================================
+4. ESPECIFICAÇÃO DO BANCO DE DADOS (MySQL - Servidor)
+================================================================================
+
+O sistema utiliza apenas banco de dados no servidor (MySQL), pois o
+aplicativo do vendedor opera sempre conectado à API, sem banco local.
+
+────────────────────────────────────────────────────────────────────────────────
+4.1. TABELAS DE LOCALIZAÇÃO
+────────────────────────────────────────────────────────────────────────────────
+
+  Tabela: estados
+  ───────────────
+  - id                  INT             PK, auto_increment
+  - nome                VARCHAR(50)     NOT NULL
+  - uf                  CHAR(2)         NOT NULL, UNIQUE
+  - ativo               TINYINT(1)      DEFAULT 1
+
+  Tabela: cidades
+  ───────────────
+  - id                  INT             PK, auto_increment
+  - nome                VARCHAR(100)    NOT NULL
+  - id_estado           INT             FK -> estados.id, NOT NULL
+  - ativo               TINYINT(1)      DEFAULT 1
+
+────────────────────────────────────────────────────────────────────────────────
+4.2. TABELAS DE PESSOAS
+────────────────────────────────────────────────────────────────────────────────
+
+  Tabela: vendedores
+  ──────────────────
+  - id                  INT             PK, auto_increment
+  - nome                VARCHAR(200)    NOT NULL
+  - email               VARCHAR(200)    NOT NULL, UNIQUE
+  - telefone            VARCHAR(20)
+  - cpf                 VARCHAR(14)     NOT NULL, UNIQUE
+  - senha_hash          VARCHAR(255)    NOT NULL
+  - data_cadastro       DATETIME        DEFAULT CURRENT_TIMESTAMP
+  - ativo               TINYINT(1)      DEFAULT 1
+
+  Tabela: clientes
+  ─────────────────
+  - id                  INT             PK, auto_increment
+  - razao_social        VARCHAR(200)    NOT NULL
+  - nome_fantasia       VARCHAR(200)
+  - cnpj                VARCHAR(18)     NOT NULL, UNIQUE
+  - email               VARCHAR(200)
+  - telefone            VARCHAR(20)
+  - cep                 VARCHAR(10)
+  - rua                 VARCHAR(200)
+  - numero              VARCHAR(20)
+  - bairro              VARCHAR(100)
+  - id_cidade           INT             FK -> cidades.id
+  - id_vendedor         INT             FK -> vendedores.id, NOT NULL
+  - sequencia_visita    INT             NOT NULL
+      -- Número de sequência na carteira do vendedor.
+      -- Usa espaçamento (10, 20, 30...) para permitir inserções
+      -- intermediárias (ex: 15 entre 10 e 20).
+  - data_cadastro       DATETIME        DEFAULT CURRENT_TIMESTAMP
+  - ativo               TINYINT(1)      DEFAULT 1
+
+────────────────────────────────────────────────────────────────────────────────
+4.3. TABELAS DE PRODUTOS
+────────────────────────────────────────────────────────────────────────────────
+
+  Tabela: categorias
+  ───────────────────
+  - id                  INT             PK, auto_increment
+  - nome                VARCHAR(100)    NOT NULL
+  - descricao           TEXT
+  - ativo               TINYINT(1)      DEFAULT 1
+
+  Tabela: produtos
+  ─────────────────
+  - id                  INT             PK, auto_increment
+  - nome                VARCHAR(200)    NOT NULL
+  - descricao           TEXT
+  - preco               DECIMAL(10,2)   NOT NULL
+  - id_categoria        INT             FK -> categorias.id
+  - disponivel          TINYINT(1)      NOT NULL, DEFAULT 1
+  - imagem_url          VARCHAR(500)
+  - estoque             DECIMAL(10,3)   DEFAULT 0
+  - unidade_medida      ENUM('UNIDADE','LITRO','KG','BALDE')
+                                        DEFAULT 'UNIDADE'
+  - perecivel           TINYINT(1)      DEFAULT 1
+      -- Indica se o produto é perecível (padrão: sim, pois são
+      -- produtos de panificação como fermentos, misturas, margarinas).
+  - data_cadastro       DATETIME        DEFAULT CURRENT_TIMESTAMP
+  - ativo               TINYINT(1)      DEFAULT 1
+
+────────────────────────────────────────────────────────────────────────────────
+4.4. TABELAS DE PEDIDOS
+────────────────────────────────────────────────────────────────────────────────
+
+  Tabela: pedidos
+  ───────────────
+  Pedidos registrados pelo vendedor no campo, vindos do app.
+
+  - id                  INT             PK, auto_increment
+  - id_vendedor         INT             FK -> vendedores.id, NOT NULL
+  - id_cliente          INT             FK -> clientes.id, NOT NULL
+  - data_pedido         DATETIME        DEFAULT CURRENT_TIMESTAMP
+  - status              ENUM('PENDENTE','CORTADO','CONFIRMADO',
+                              'EM_SEPARACAO','ENVIADO','ENTREGUE',
+                              'CANCELADO')
+                                        DEFAULT 'PENDENTE'
+  - janela_entrega      ENUM('12H','19H')
+      -- Janela de entrega alocada automaticamente conforme o horário
+      -- do pedido (mais próxima de 12h ou 19h).
+  - observacao          TEXT
+  - valor_total         DECIMAL(10,2)
+
+  Tabela: itens_pedido
+  ────────────────────
+  - id                  INT             PK, auto_increment
+  - id_pedido           INT             FK -> pedidos.id, NOT NULL
+  - id_produto          INT             FK -> produtos.id, NOT NULL
+  - quantidade_pedida   DECIMAL(10,3)   NOT NULL
+      -- Quantidade original solicitada pelo vendedor.
+  - quantidade_entregue DECIMAL(10,3)
+      -- Quantidade real após o corte. Preenchido pela distribuidora
+      -- durante o processo de corte. Pode ser igual ou menor que
+      -- a quantidade pedida.
+  - preco_unitario      DECIMAL(10,2)   NOT NULL
+  - subtotal            DECIMAL(10,2)   NOT NULL
+      -- Calculado sobre a quantidade_entregue (após corte).
+
+────────────────────────────────────────────────────────────────────────────────
+4.5. TABELAS DE VENDA E FINANCEIRO
+────────────────────────────────────────────────────────────────────────────────
+
+  Tabela: condicoes_pagamento
+  ──────────────────────────
+  Define as condições de pagamento disponíveis (ex: "10 - 7/14 dias").
+
+  - id                  INT             PK, auto_increment
+  - codigo              VARCHAR(10)     NOT NULL, UNIQUE
+      -- Código identificador (ex: "10", "20").
+  - descricao           VARCHAR(200)    NOT NULL
+      -- Descrição legível (ex: "7/14 dias - Boleto Bancário").
+  - multa_percentual    DECIMAL(5,2)    NOT NULL DEFAULT 0
+      -- Percentual de multa por atraso (ex: 5.00 = 5%).
+  - juros_dia_percentual DECIMAL(5,2)   NOT NULL DEFAULT 0
+      -- Percentual de juros por dia de atraso (ex: 2.00 = 2%).
+  - desconto_dia_percentual DECIMAL(5,2) NOT NULL DEFAULT 0
+      -- Percentual de desconto por dia de antecipação (ex: 1.00 = 1%).
+  - ativo               TINYINT(1)      DEFAULT 1
+
+  Tabela: parcelas_condicao
+  ────────────────────────
+  Define as parcelas de cada condição de pagamento.
+
+  - id                  INT             PK, auto_increment
+  - id_condicao         INT             FK -> condicoes_pagamento.id, NOT NULL
+  - numero_parcela      INT             NOT NULL
+      -- Número sequencial da parcela (1, 2, 3...).
+  - dias_prazo          INT             NOT NULL
+      -- Dias após a venda para vencimento (ex: 7, 14, 21).
+  - percentual          DECIMAL(5,2)    NOT NULL
+      -- Percentual do valor total nesta parcela (ex: 50.00 = 50%).
+  - forma_pagamento     ENUM('BOLETO','PIX','DINHEIRO','CHEQUE',
+                              'TRANSFERENCIA')
+                                        NOT NULL
+
+  Tabela: vendas
+  ──────────────
+  Venda efetivada a partir de um pedido (após corte e confirmação).
+
+  - id                  INT             PK, auto_increment
+  - id_pedido           INT             FK -> pedidos.id, NOT NULL
+  - id_cliente          INT             FK -> clientes.id, NOT NULL
+  - id_vendedor         INT             FK -> vendedores.id, NOT NULL
+  - id_condicao         INT             FK -> condicoes_pagamento.id, NOT NULL
+  - data_venda          DATETIME        DEFAULT CURRENT_TIMESTAMP
+  - numero_nota         VARCHAR(20)     NOT NULL
+      -- Número da nota fiscal.
+  - valor_total         DECIMAL(10,2)   NOT NULL
+
+  Tabela: itens_venda
+  ───────────────────
+  - id                  INT             PK, auto_increment
+  - id_venda            INT             FK -> vendas.id, NOT NULL
+  - id_produto          INT             FK -> produtos.id, NOT NULL
+  - quantidade          DECIMAL(10,3)   NOT NULL
+  - preco_unitario      DECIMAL(10,2)   NOT NULL
+  - subtotal            DECIMAL(10,2)   NOT NULL
+
+  Tabela: contas_receber
+  ─────────────────────
+  Parcelas geradas automaticamente a partir de uma venda, conforme
+  a condição de pagamento selecionada.
+
+  - id                  INT             PK, auto_increment
+  - id_venda            INT             FK -> vendas.id, NOT NULL
+  - id_cliente          INT             FK -> clientes.id, NOT NULL
+  - numero_parcela      INT             NOT NULL
+      -- Ex: 1, 2, 3... (mesmo número da parcela na condição).
+  - numero_documento    VARCHAR(30)     NOT NULL
+      -- Formato: "NF/parcela" (ex: "123/1", "123/2").
+  - data_vencimento     DATE            NOT NULL
+  - valor_original      DECIMAL(10,2)   NOT NULL
+      -- Valor da parcela sem multa/juros/desconto.
+  - valor_multa         DECIMAL(10,2)   DEFAULT 0
+  - valor_juros         DECIMAL(10,2)   DEFAULT 0
+  - valor_desconto      DECIMAL(10,2)   DEFAULT 0
+  - valor_pago          DECIMAL(10,2)   DEFAULT 0
+  - data_pagamento      DATE
+  - forma_pagamento     ENUM('BOLETO','PIX','DINHEIRO','CHEQUE',
+                              'TRANSFERENCIA')
+                                        NOT NULL
+  - status              ENUM('ABERTO','PAGO','VENCIDO','CANCELADO')
+                                        DEFAULT 'ABERTO'
+
+
+================================================================================
+5. REQUISITOS FUNCIONAIS
+================================================================================
+
+--- APP MOBILE (Vendedor Externo) ---
+
+RF01 - Cadastro na primeira inicialização
+  Na primeira inicialização do app, o vendedor informa e-mail e senha
+  para autenticação via API. Após autenticado com sucesso, a sessão
+  fica salva localmente no dispositivo e o vendedor não precisa fazer
+  login novamente nas próximas aberturas do app. É direcionado
+  automaticamente ao roteiro de visitas.
+
+RF02 - Roteiro de Visitas
+  O app exibe a carteira de clientes do vendedor logado, ordenada pela
+  sequência de visita (campo sequencia_visita). O vendedor visualiza
+  a lista de clientes na ordem em que deve visitá-los.
+
+RF03 - Consulta de Cliente
+  O vendedor pode consultar os dados de cada cliente da sua carteira:
+  razão social, CNPJ, endereço, telefone, e-mail.
+
+RF04 - Cadastrar Novo Cliente
+  O vendedor pode cadastrar um novo cliente diretamente pelo app,
+  informando os dados necessários e definindo a sequência de visita.
+  O cadastro é enviado à API para gravação no MySQL.
+
+RF05 - Histórico de Compras do Cliente
+  Ao selecionar um cliente, o vendedor visualiza os produtos que já
+  vendeu para ele, com quantidade da última compra e preço praticado.
+
+RF06 - Consulta de Débitos do Cliente
+  O vendedor visualiza quanto o cliente está devendo (contas a receber
+  em aberto e vencidas), para negociação antes de registrar novo pedido.
+
+RF07 - Catálogo de Produtos
+  O app exibe a lista de produtos disponíveis da distribuidora, com
+  nome, descrição, preço, categoria, imagem e unidade de medida.
+  Permite filtro por categoria.
+
+RF08 - Registrar Pedido de Venda
+  O vendedor seleciona produtos do catálogo, define quantidades e
+  registra o pedido para o cliente. O pedido é enviado à API com
+  status "Pendente".
+
+RF09 - Disparar Envio de Pedidos
+  O vendedor pode disparar o envio dos pedidos registrados para a
+  distribuidora. Os pedidos são alocados automaticamente na janela
+  de entrega mais próxima (12h ou 19h).
+
+RF10 - Histórico de Pedidos
+  O app exibe o histórico de pedidos registrados pelo vendedor, com
+  status, data e valor.
+
+
+--- SITE WEB (Administração da Distribuidora) ---
+
+RF11 - Login do Administrador
+  Autenticação por e-mail e senha para acesso ao painel da distribuidora.
+
+RF12 - CRUD de Estados
+  Cadastro, consulta, edição e desativação de estados.
+
+RF13 - CRUD de Cidades
+  Cadastro, consulta, edição e desativação de cidades, vinculadas
+  a um estado.
+
+RF14 - CRUD de Categorias
+  Cadastro, consulta, edição e desativação de categorias de produtos.
+
+RF15 - CRUD de Produtos
+  Cadastro, consulta, edição e desativação de produtos, com preço,
+  categoria, imagem, estoque, unidade de medida e flag perecível.
+
+RF16 - CRUD de Vendedores
+  Cadastro, consulta, edição e desativação de vendedores. Inclui
+  atribuição/gestão de carteira de clientes.
+
+RF17 - CRUD de Clientes
+  Cadastro, consulta, edição e desativação de clientes. Cada cliente
+  é vinculado a um vendedor e possui uma sequência de visita.
+
+RF18 - CRUD de Condições de Pagamento
+  Cadastro, consulta, edição e desativação de condições de pagamento,
+  incluindo parcelas, formas de pagamento, multa, juros e desconto.
+
+RF19 - Receber Pedidos dos Vendedores
+  O site exibe todos os pedidos recebidos dos vendedores, agrupados
+  por janela de entrega (12h e 19h).
+
+RF20 - Corte de Pedidos (Semi-automático)
+  Quando a demanda total de um produto excede o estoque disponível,
+  o sistema sugere automaticamente o corte proporcional, priorizando
+  clientes sem dívida e com bom histórico de pagamento. O operador
+  da distribuidora pode revisar, ajustar manualmente as quantidades
+  de entrega e confirmar o corte.
+
+RF21 - Gerar Venda a partir do Pedido
+  Após o corte e confirmação, o pedido é convertido em uma venda.
+  O sistema gera os itens da venda com as quantidades entregues
+  (pós-corte) e solicita o número da nota fiscal e a condição de
+  pagamento.
+
+RF22 - Geração Automática de Contas a Receber
+  Ao confirmar a venda, o sistema gera automaticamente as parcelas
+  de contas a receber com base na condição de pagamento selecionada.
+  Exemplo:
+    Venda 19/10 — Valor R$ 235,00 — NF 123 — Condição "10" (7/14 dias)
+    → 123/1  —  26/10  —  R$ 117,50  —  Boleto Bancário
+    → 123/2  —  02/11  —  R$ 117,50  —  Boleto Bancário
+
+RF23 - Gestão de Contas a Receber
+  O site exibe as contas a receber com filtros por cliente, vendedor,
+  status (aberto, vencido, pago) e período. Permite registrar
+  pagamentos (baixa de títulos).
+
+RF24 - Cálculo Automático de Multa, Juros e Desconto
+  Ao registrar o pagamento de uma parcela:
+    - Se pago APÓS o vencimento: aplica multa fixa (%) + juros por dia
+      de atraso (%).
+    - Se pago ANTES do vencimento: aplica desconto por dia de
+      antecipação (%).
+  Os percentuais são definidos na condição de pagamento da venda.
+
+RF25 - Consulta de Pedidos
+  O site exibe a lista de todos os pedidos com status, vendedor,
+  cliente, data, valor e janela de entrega.
+
+RF26 - Consulta de Vendas
+  O site exibe a lista de vendas com nota fiscal, cliente, vendedor,
+  valor, condição de pagamento e data.
+
+
+--- COMUM (App e Site) ---
+
+RF27 - Status do Pedido
+  Cada pedido possui um status que pode ser:
+    - Pendente (registrado pelo vendedor)
+    - Cortado (distribuidora aplicou corte de estoque)
+    - Confirmado (distribuidora confirmou o pedido/corte)
+    - Em Separação
+    - Enviado
+    - Entregue
+    - Cancelado
+
+RF28 - Janelas de Entrega
+  As entregas são realizadas em dois horários fixos: 12h e 19h.
+  Ao disparar o envio dos pedidos, cada pedido é automaticamente
+  alocado na janela de entrega mais próxima do momento do envio.
+
+
+================================================================================
+6. REQUISITOS NÃO FUNCIONAIS
+================================================================================
+
+RNF01 - Segurança
+  Comunicação via HTTPS (TLS). Senhas armazenadas como hash
+  (bcrypt ou SHA-256).
+
+RNF02 - Desempenho
+  A API deve responder em tempo aceitável (< 2 segundos para
+  listagens e operações de pedido).
+
+RNF03 - Portabilidade
+  O app deve funcionar em Android via .NET MAUI.
+  O site deve funcionar nos principais navegadores modernos.
+
+RNF04 - Manutenibilidade
+  Código versionado no Git/GitHub, com separação de responsabilidades.
+
+RNF05 - Disponibilidade
+  A API e o MySQL devem estar hospedados em servidor acessível.
+
+RNF06 - Conectividade
+  O aplicativo do vendedor requer conexão com a internet para
+  funcionamento (não possui modo offline).
+
+
+================================================================================
+7. REGRAS DE NEGÓCIO
+================================================================================
+
+--- APP MOBILE (Vendedor Externo) ---
+
+RN01 - Carteira de Clientes
+  Cada vendedor possui uma carteira de clientes exclusiva. O vendedor
+  só visualiza e faz pedidos para os clientes da sua carteira.
+
+RN02 - Sessão Persistente do Vendedor
+  O login do vendedor é realizado apenas na primeira inicialização
+  do aplicativo. Após autenticação bem-sucedida, a sessão (token)
+  fica salva no dispositivo e o vendedor acessa o app diretamente
+  nas próximas aberturas, sem necessidade de novo login.
+
+RN03 - Sequência de Visita com Espaçamento
+  Os clientes na carteira do vendedor possuem uma sequência de visita
+  (IDs com espaçamento: 10, 20, 30...). Ao adicionar um novo cliente
+  no meio do roteiro, utiliza-se um número intermediário:
+    - Entre 10 e 20: pode ser 15 (meio do caminho), 12 ou 13
+      (mais próximo do 10), 17 ou 18 (mais próximo do 20).
+  Isso evita a necessidade de renumerar toda a sequência.
+
+RN04 - Consulta de Débitos antes do Pedido
+  O vendedor deve poder verificar a situação financeira do cliente
+  (débitos em aberto e vencidos) antes de registrar um novo pedido,
+  para negociação em campo.
+
+RN05 - Informações da Última Compra
+  Ao acessar um cliente, o vendedor visualiza os produtos da última
+  compra com quantidade e preço, facilitando a sugestão de reposição.
+
+RN06 - Janela de Entrega Automática
+  Ao disparar os pedidos, o sistema aloca automaticamente cada pedido
+  na janela de entrega mais próxima (12h ou 19h) com base no horário
+  atual de envio.
+
+
+--- SITE WEB (Administração) ---
+
+RN07 - Corte de Pedidos Semi-automático
+  Quando o total pedido de um produto excede o estoque disponível,
+  o sistema calcula automaticamente uma sugestão de corte proporcional,
+  com prioridade para clientes adimplentes (sem dívida vencida) e com
+  bom histórico de pagamento. O operador pode ajustar as quantidades
+  manualmente antes de confirmar.
+
+RN08 - Conversão Pedido → Venda
+  Um pedido só gera uma venda após o corte ser confirmado pela
+  distribuidora. A venda registra as quantidades efetivamente
+  entregues (pós-corte).
+
+RN09 - Contas a Receber Automáticas
+  Ao confirmar uma venda, as parcelas de contas a receber são geradas
+  automaticamente com base na condição de pagamento:
+    - O valor total é dividido conforme os percentuais das parcelas.
+    - As datas de vencimento são calculadas a partir da data da venda
+      somando os dias de prazo de cada parcela.
+    - O número do documento segue o formato "NF/parcela"
+      (ex: "123/1", "123/2").
+
+RN09 - Multa, Juros e Desconto
+  Ao registrar pagamento de uma parcela:
+    - Pagamento em atraso:
+        Valor = valor_original + (valor_original × multa%)
+                + (valor_original × juros_dia% × dias_atraso)
+    - Pagamento antecipado:
+        Valor = valor_original - (valor_original × desconto_dia%
+                × dias_antecipação)
+  Os percentuais são herdados da condição de pagamento da venda.
+
+RN10 - Produtos Perecíveis
+  Os produtos da distribuidora são majoritariamente perecíveis
+  (fermentos, misturas para bolos e salgados, margarinas). O campo
+  "perecível" indica essa condição e pode ser considerado na
+  priorização de entregas.
+
+RN11 - Gestão de Vendedores e Carteiras
+  O site permite cadastrar vendedores e gerenciar suas carteiras de
+  clientes (atribuir/remover clientes de um vendedor e definir a
+  sequência de visita).
+
+
+--- COMUM ---
+
+RN12 - Fluxo de Status do Pedido
+  O status do pedido segue a ordem:
+    Pendente → Cortado → Confirmado → Em Separação → Enviado → Entregue
+  Cancelamento permitido nos status Pendente, Cortado, Confirmado ou
+  Em Separação. Pedidos enviados, entregues ou já cancelados não podem
+  ser cancelados novamente.
+
+RN13 - CNPJ Único de Cliente
+  Não é permitido mais de um cadastro de cliente com o mesmo CNPJ.
+
+RN14 - CPF Único de Vendedor
+  Não é permitido mais de um cadastro de vendedor com o mesmo CPF.
+
+RN15 - Estoque
+  A quantidade entregue após o corte deve respeitar o estoque
+  disponível. Ao confirmar a venda, o estoque é decrementado.
+  Ao cancelar uma venda antes do envio, o estoque é devolvido.
+
+
+================================================================================
+8. CONDIÇÕES DE PAGAMENTO (EXEMPLOS DE REFERÊNCIA)
+================================================================================
+
+As condições de pagamento são configuráveis pelo administrador no site.
+Abaixo os exemplos de referência do negócio:
+
+── Condição 10: 7/14 dias ──────────────────────────────────────────────
+
+  Multa: 5%  |  Juros: 2% ao dia  |  Desconto: 1% ao dia
+
+  Parcela   Prazo     Percentual   Forma de Pagamento
+  ────────  ────────  ───────────  ──────────────────
+  1         7 dias    50%          Boleto Bancário
+  2         14 dias   50%          Boleto Bancário
+
+  Exemplo prático:
+    Venda em 19/10 — Valor R$ 235,00 — NF 123
+    → 123/1   26/10   R$ 117,50   Boleto Bancário
+    → 123/2   02/11   R$ 117,50   Boleto Bancário
+
+
+── Condição 20: 7/14/21 dias ───────────────────────────────────────────
+
+  Multa: 5%  |  Juros: 2% ao dia  |  Desconto: 1% ao dia
+
+  Parcela   Prazo     Percentual   Forma de Pagamento
+  ────────  ────────  ───────────  ──────────────────
+  1         7 dias    33,33%       PIX
+  2         14 dias   33,33%       Boleto Bancário
+  3         21 dias   33,33%       Boleto Bancário
+
+
+================================================================================
+9. FLUXOS DO SISTEMA
+================================================================================
+
+9.1. FLUXO - APP: ROTEIRO DE VISITAS E PEDIDO
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Vendedor abre o app pela primeira vez.
+  2. Tela de cadastro/login é exibida (e-mail e senha via API).
+  3. Após autenticação, a sessão é salva no dispositivo.
+     (Nas aberturas seguintes, o login não é solicitado novamente.)
+  4. App exibe o roteiro de visitas (carteira de clientes ordenada
+     por sequência de visita).
+  5. Vendedor seleciona o cliente que está visitando.
+  6. App exibe informações do cliente:
+     - Dados cadastrais
+     - Produtos da última compra (quantidade e preço)
+     - Débitos em aberto / vencidos
+  7. Vendedor consulta o catálogo de produtos.
+  8. Seleciona produtos e define quantidades.
+  9. Confirma o pedido para aquele cliente.
+  10. Pedido é enviado à API com status "Pendente".
+  11. Repete para os próximos clientes do roteiro.
+
+9.2. FLUXO - APP: DISPARAR PEDIDOS PARA ENTREGA
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Vendedor finaliza suas visitas do dia/período.
+  2. Toca em "Enviar Pedidos" para disparar os pedidos pendentes.
+  3. Sistema verifica o horário atual e aloca cada pedido na janela
+     de entrega mais próxima (12h ou 19h).
+  4. Pedidos são marcados como enviados para a distribuidora.
+  5. Distribuidora recebe os pedidos no site para processamento.
+
+9.3. FLUXO - APP: CADASTRAR NOVO CLIENTE
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Vendedor encontra um novo potencial cliente durante o roteiro.
+  2. Toca em "Novo Cliente".
+  3. Preenche: razão social, nome fantasia, CNPJ, e-mail, telefone,
+     endereço completo.
+  4. Define a sequência de visita (número intermediário entre os
+     clientes anterior e posterior no roteiro).
+  5. Sistema valida CNPJ (unicidade) e dados obrigatórios.
+  6. Dados são enviados à API e gravados no MySQL.
+  7. Cliente é adicionado à carteira do vendedor.
+
+9.4. FLUXO - SITE: RECEBIMENTO E CORTE DE PEDIDOS
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Distribuidora acessa o painel e visualiza os pedidos recebidos,
+     agrupados por janela de entrega (12h ou 19h).
+  2. Para cada produto, o sistema compara o total pedido com o
+     estoque disponível.
+  3. Se demanda ≤ estoque: pedido segue sem corte.
+  4. Se demanda > estoque: sistema sugere corte proporcional,
+     priorizando clientes adimplentes.
+     Exemplo:
+       Produto XYZ — Estoque: 15 unidades
+       Cliente A pediu 5  → sugestão: 4
+       Cliente B pediu 8  → sugestão: 5
+       Cliente C pediu 9  → sugestão: 6
+  5. Operador revisa as sugestões e ajusta se necessário.
+  6. Operador confirma o corte.
+  7. Pedidos atualizados com status "Cortado" e quantidades de
+     entrega definidas.
+
+9.5. FLUXO - SITE: GERAR VENDA E CONTAS A RECEBER
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Após o corte ser confirmado, o operador seleciona o pedido
+     para gerar a venda.
+  2. Informa o número da nota fiscal e a condição de pagamento.
+  3. Sistema cria a venda com os itens (quantidades pós-corte).
+  4. Sistema gera automaticamente as parcelas de contas a receber:
+     - Calcula valor de cada parcela (percentual × valor total).
+     - Calcula data de vencimento (data_venda + dias_prazo).
+     - Gera número do documento (NF/parcela).
+     - Define forma de pagamento por parcela.
+  5. Estoque é decrementado conforme as quantidades vendidas.
+  6. Pedido atualizado para status "Confirmado".
+
+9.6. FLUXO - SITE: REGISTRAR PAGAMENTO (BAIXA DE TÍTULO)
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Operador acessa Contas a Receber e localiza a parcela.
+  2. Informa a data do pagamento.
+  3. Sistema calcula automaticamente:
+     - Se data_pagamento > data_vencimento:
+       dias_atraso = data_pagamento - data_vencimento
+       multa = valor_original × multa_percentual / 100
+       juros = valor_original × juros_dia_percentual / 100 × dias_atraso
+       valor_final = valor_original + multa + juros
+     - Se data_pagamento < data_vencimento:
+       dias_antecipacao = data_vencimento - data_pagamento
+       desconto = valor_original × desconto_dia_percentual / 100
+                  × dias_antecipacao
+       valor_final = valor_original - desconto
+     - Se data_pagamento = data_vencimento:
+       valor_final = valor_original
+  4. Operador confirma o valor e registra o pagamento.
+  5. Parcela é marcada como "Pago" com os valores registrados.
+
+9.7. FLUXO - SITE: ATUALIZAÇÃO DE STATUS DE ENTREGA
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Operador atualiza o status do pedido conforme a entrega avança:
+     Confirmado → Em Separação → Enviado → Entregue.
+  2. Cancelamento possível antes de "Enviado".
+  3. Vendedor (app) visualiza o status atualizado do pedido.
+
+
+================================================================================
+10. ATRIBUTOS DAS ENTIDADES (RESUMO)
+================================================================================
+
+10.1. ESTADO
+  - ID
+  - Nome
+  - UF (sigla, único)
+  - Ativo (sim/não)
+
+10.2. CIDADE
+  - ID
+  - Nome
+  - Estado (FK)
+  - Ativo (sim/não)
+
+10.3. VENDEDOR
+  - ID
+  - Nome
+  - E-mail (único)
+  - Telefone
+  - CPF (único, validado)
+  - Senha (hash)
+  - Data de cadastro
+  - Ativo (sim/não)
+
+10.4. CLIENTE (Panificadora/Padaria)
+  - ID
+  - Razão Social
+  - Nome Fantasia
+  - CNPJ (único, validado)
+  - E-mail
+  - Telefone
+  - Endereço: CEP, Rua, Número, Bairro, Cidade (FK)
+  - Vendedor (FK)
+  - Sequência de visita
+  - Data de cadastro
+  - Ativo (sim/não)
+
+10.5. CATEGORIA
+  - ID
+  - Nome
+  - Descrição
+  - Ativo (sim/não)
+
+10.6. PRODUTO
+  - ID
+  - Nome
+  - Descrição
+  - Preço
+  - Categoria (FK)
+  - Disponível (sim/não)
+  - URL da imagem
+  - Estoque (quantidade)
+  - Unidade de medida (unidade, litro, kg, balde)
+  - Perecível (sim/não)
+  - Data de cadastro
+  - Ativo (sim/não)
+
+10.7. PEDIDO (feito pelo vendedor via app)
+  - ID
+  - Vendedor (FK)
+  - Cliente (FK)
+  - Data do pedido
+  - Status
+  - Janela de entrega (12h / 19h)
+  - Observação
+  - Valor total
+
+10.8. ITEM DO PEDIDO
+  - ID
+  - Pedido (FK)
+  - Produto (FK)
+  - Quantidade pedida
+  - Quantidade entregue (pós-corte)
+  - Preço unitário
+  - Subtotal
+
+10.9. CONDIÇÃO DE PAGAMENTO
+  - ID
+  - Código (único)
+  - Descrição
+  - Multa percentual
+  - Juros por dia percentual
+  - Desconto por dia percentual
+  - Ativo (sim/não)
+
+10.10. PARCELA DA CONDIÇÃO
+  - ID
+  - Condição de Pagamento (FK)
+  - Número da parcela
+  - Dias de prazo
+  - Percentual do valor
+  - Forma de pagamento
+
+10.11. VENDA (gerada a partir de pedido confirmado)
+  - ID
+  - Pedido (FK)
+  - Cliente (FK)
+  - Vendedor (FK)
+  - Condição de Pagamento (FK)
+  - Data da venda
+  - Número da nota fiscal
+  - Valor total
+
+10.12. ITEM DA VENDA
+  - ID
+  - Venda (FK)
+  - Produto (FK)
+  - Quantidade
+  - Preço unitário
+  - Subtotal
+
+10.13. CONTA A RECEBER
+  - ID
+  - Venda (FK)
+  - Cliente (FK)
+  - Número da parcela
+  - Número do documento (NF/parcela)
+  - Data de vencimento
+  - Valor original
+  - Valor da multa
+  - Valor dos juros
+  - Valor do desconto
+  - Valor pago
+  - Data do pagamento
+  - Forma de pagamento
+  - Status (aberto, pago, vencido, cancelado)
+
+
+================================================================================
+11. ESPECIFICAÇÃO POR PLATAFORMA
+================================================================================
+
+11.1. VANDERPAN APP (Aplicativo Mobile - .NET MAUI)
+     Público: VENDEDOR EXTERNO
+────────────────────────────────────────────────────────────────────────────────
+
+  Objetivo: Aplicativo mobile para vendedores externos da distribuidora
+  visitarem clientes, registrarem pedidos, consultarem histórico de
+  compras e débitos.
+
+  Tecnologias:
+    - C# / .NET MAUI
+    - Sem banco local (consome API REST diretamente)
+    - Consumo de API REST via HttpClient
+    - Visual Studio Code
+
+  Telas:
+    1. Cadastro/Login (primeira inicialização) - e-mail e senha,
+       sessão salva no dispositivo após autenticação
+    2. Roteiro de Visitas - lista de clientes da carteira ordenada
+       por sequência de visita
+    3. Detalhes do Cliente - dados cadastrais, última compra, débitos
+    4. Cadastro de Novo Cliente - formulário completo com sequência
+       de visita
+    5. Catálogo de Produtos - lista com filtro por categoria
+    6. Detalhes do Produto - informações completas
+    7. Carrinho / Confirmar Pedido - itens selecionados, quantidades
+    8. Meus Pedidos - histórico com status e janela de entrega
+    9. Detalhes do Pedido - itens, valores, status
+
+  Funcionalidades Específicas:
+    - Sessão persistente (login apenas na primeira inicialização)
+    - Roteiro de visitas com sequência espaçada
+    - Consulta de débitos do cliente em tempo real
+    - Histórico de compras do cliente (última compra)
+    - Disparo de pedidos com alocação automática em janela de entrega
+    - Cadastro de novo cliente em campo
+
+
+11.2. VANDERPAN WEB (Site / Painel Administrativo)
+     Público: DISTRIBUIDORA (gestão)
+────────────────────────────────────────────────────────────────────────────────
+
+  Objetivo: Painel administrativo para a distribuidora gerenciar
+  cadastros, receber e processar pedidos dos vendedores, controlar
+  vendas, contas a receber e entregas.
+
+  Tecnologias:
+    - Frontend web (Blazor, ou HTML/CSS/JS com framework)
+    - Consumo da mesma API REST
+    - Visual Studio Code
+
+  Páginas:
+    1. Login - e-mail e senha
+    2. Dashboard - visão geral (pedidos pendentes, contas vencidas, etc.)
+    3. Cadastro de Estados - CRUD
+    4. Cadastro de Cidades - CRUD (vinculadas a estado)
+    5. Cadastro de Categorias - CRUD
+    6. Cadastro de Produtos - CRUD com estoque e flag perecível
+    7. Cadastro de Vendedores - CRUD com gestão de carteira
+    8. Cadastro de Clientes - CRUD com sequência de visita
+    9. Cadastro de Condições de Pagamento - CRUD com parcelas
+    10. Pedidos Recebidos - listagem agrupada por janela de entrega
+    11. Corte de Pedidos - tela de sugestão e ajuste de corte
+    12. Vendas - listagem e geração a partir de pedido confirmado
+    13. Contas a Receber - listagem, filtros, baixa de títulos
+    14. Relatórios (opcional) - vendas por período, vendedor, cliente
+
+  Funcionalidades Específicas:
+    - Design responsivo (desktop e mobile)
+    - Corte semi-automático com sugestão inteligente
+    - Geração automática de contas a receber
+    - Cálculo automático de multa, juros e desconto
+    - Gestão de carteira de vendedores
+
+
+11.3. API REST (Backend - ASP.NET Core)
+────────────────────────────────────────────────────────────────────────────────
+
+  Objetivo: Centralizar toda a lógica de negócio, gerenciar o banco
+  MySQL, e servir dados para o app e o site.
+
+  Tecnologias:
+    - C# / ASP.NET Core Web API
+    - MySQL (Entity Framework Core ou Dapper)
+    - Visual Studio Code
+    - HTTPS (TLS)
+
+  Endpoints Principais:
+
+  -- Autenticação --
+    POST   /api/auth/vendedor/login        → Cadastro/Login do vendedor
+                                             (primeira inicialização,
+                                              retorna token persistente)
+    POST   /api/auth/admin/login           → Login do administrador
+
+  -- Estados e Cidades --
+    GET    /api/estados                    → Listar estados
+    POST   /api/estados                    → Criar estado
+    PUT    /api/estados/{id}               → Editar estado
+    DELETE /api/estados/{id}               → Desativar estado
+    GET    /api/cidades                    → Listar cidades
+    POST   /api/cidades                    → Criar cidade
+    PUT    /api/cidades/{id}               → Editar cidade
+    DELETE /api/cidades/{id}               → Desativar cidade
+
+  -- Vendedores --
+    GET    /api/vendedores                 → Listar vendedores
+    POST   /api/vendedores                 → Cadastrar vendedor
+    PUT    /api/vendedores/{id}            → Editar vendedor
+    DELETE /api/vendedores/{id}            → Desativar vendedor
+    GET    /api/vendedores/{id}/carteira   → Carteira de clientes
+
+  -- Clientes --
+    GET    /api/clientes                   → Listar clientes
+    POST   /api/clientes                   → Cadastrar cliente
+    PUT    /api/clientes/{id}              → Editar cliente
+    DELETE /api/clientes/{id}              → Desativar cliente
+    GET    /api/clientes/{id}/debitos      → Débitos do cliente
+    GET    /api/clientes/{id}/historico    → Histórico de compras
+
+  -- Categorias --
+    GET    /api/categorias                 → Listar categorias
+    POST   /api/categorias                 → Criar categoria
+    PUT    /api/categorias/{id}            → Editar categoria
+    DELETE /api/categorias/{id}            → Desativar categoria
+
+  -- Produtos --
+    GET    /api/produtos                   → Listar produtos disponíveis
+    GET    /api/produtos/{id}              → Detalhes de um produto
+    POST   /api/produtos                   → Criar produto
+    PUT    /api/produtos/{id}              → Editar produto
+    DELETE /api/produtos/{id}              → Desativar produto
+
+  -- Pedidos --
+    POST   /api/pedidos                    → Criar pedido (vendedor)
+    GET    /api/pedidos                    → Listar pedidos (admin)
+    GET    /api/pedidos/vendedor/{id}      → Pedidos de um vendedor
+    GET    /api/pedidos/{id}               → Detalhes do pedido
+    PATCH  /api/pedidos/{id}/status        → Atualizar status
+    POST   /api/pedidos/enviar             → Disparar envio (vendedor)
+    POST   /api/pedidos/corte              → Aplicar corte (admin)
+    POST   /api/pedidos/corte/sugestao     → Obter sugestão de corte
+
+  -- Condições de Pagamento --
+    GET    /api/condicoes-pagamento        → Listar condições
+    POST   /api/condicoes-pagamento        → Criar condição
+    PUT    /api/condicoes-pagamento/{id}   → Editar condição
+    DELETE /api/condicoes-pagamento/{id}   → Desativar condição
+
+  -- Vendas --
+    POST   /api/vendas                     → Gerar venda (a partir de pedido)
+    GET    /api/vendas                     → Listar vendas
+    GET    /api/vendas/{id}                → Detalhes da venda
+
+  -- Contas a Receber --
+    GET    /api/contas-receber             → Listar contas a receber
+    GET    /api/contas-receber/cliente/{id} → Contas de um cliente
+    PATCH  /api/contas-receber/{id}/pagar  → Registrar pagamento (baixa)
+
+
+================================================================================
+12. SEGURANÇA E CRIPTOGRAFIA
+================================================================================
+
+  - Toda comunicação entre clientes (app/site) e API utiliza HTTPS
+    (TLS), garantindo criptografia em trânsito.
+  - Senhas nunca são armazenadas em texto puro. São convertidas para
+    hash utilizando bcrypt ou SHA-256 antes de serem gravadas.
+  - CNPJ e CPF são dados sensíveis e devem ser tratados conforme a
+    LGPD (Lei Geral de Proteção de Dados).
+
+
+================================================================================
+13. DOCUMENTAÇÃO DO DESENVOLVIMENTO
+================================================================================
+
+  - O desenvolvimento será auxiliado pela ferramenta Gemini integrada
+    ao Visual Studio Code.
+  - Os prompts utilizados durante o desenvolvimento serão documentados
+    como parte do registro do processo de criação.
+  - Controle de versão via Git/GitHub.
+  - Projeto acadêmico desenvolvido como trabalho de faculdade.
+
+
+================================================================================
+                          FIM DA ESPECIFICAÇÃO
+================================================================================

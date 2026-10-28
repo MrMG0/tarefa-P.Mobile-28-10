@@ -1,0 +1,350 @@
+@page "/contas-receber"
+@inject ApiService Api
+
+<PageTitle>Contas a Receber - VanderPan</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Contas a Receber</h2>
+        <p class="text-muted mb-0">Gestão financeira com cálculo automático de multa, juros e desconto por antecipação</p>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="CarregarTitulos">
+        🔄 Atualizar
+    </button>
+</div>
+
+<!-- FILTROS -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Status do Título</label>
+                <select class="form-select" @bind="filtroStatus" @bind:after="Filtrar">
+                    <option value="">Todos os status</option>
+                    @foreach (var s in Enum.GetValues<StatusContaReceber>())
+                    {
+                        <option value="@s">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small fw-semibold">Cliente / Padaria</label>
+                <select class="form-select" @bind="filtroCliente" @bind:after="Filtrar">
+                    <option value="0">Todos os clientes</option>
+                    @foreach (var c in clientes)
+                    {
+                        <option value="@c.Id">@c.RazaoSocial</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <div class="text-end w-100">
+                    <span class="text-muted small">Total Exibido:</span>
+                    <strong class="text-dark fs-6 d-block">R$ @titulosFiltrados.Sum(t => t.ValorOriginal).ToString("N2")</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABELA DE TÍTULOS -->
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Doc. (NF/Parc)</th>
+                    <th>Cliente</th>
+                    <th>Vencimento</th>
+                    <th>Forma Pgto</th>
+                    <th>Valor Original</th>
+                    <th>Multa / Juros / Desc.</th>
+                    <th>Valor Pago</th>
+                    <th>Data Pgto</th>
+                    <th>Status</th>
+                    <th class="text-end">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (carregando)
+                {
+                    <tr>
+                        <td colspan="10" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </td>
+                    </tr>
+                }
+                else if (!titulosFiltrados.Any())
+                {
+                    <tr>
+                        <td colspan="10" class="text-center py-4 text-muted">
+                            Nenhum título encontrado para os filtros selecionados.
+                        </td>
+                    </tr>
+                }
+                @foreach (var t in titulosFiltrados)
+                {
+                    <tr>
+                        <td class="fw-bold text-primary">@t.NumeroDocumento</td>
+                        <td>
+                            <div class="fw-semibold">@(t.Cliente?.RazaoSocial ?? "Cliente")</div>
+                            <small class="text-muted">NF #@(t.Venda?.NumeroNota)</small>
+                        </td>
+                        <td>
+                            <span class="@(t.DataVencimento.Date < DateTime.UtcNow.Date && t.Status != StatusContaReceber.PAGO ? "text-danger fw-bold" : "")">
+                                @t.DataVencimento.ToString("dd/MM/yyyy")
+                            </span>
+                        </td>
+                        <td><span class="badge bg-secondary">@t.FormaPagamento</span></td>
+                        <td class="fw-bold">R$ @t.ValorOriginal.ToString("N2")</td>
+                        <td>
+                            @if (t.Status == StatusContaReceber.PAGO)
+                            {
+                                @if (t.ValorMulta > 0 || t.ValorJuros > 0)
+                                {
+                                    <span class="text-danger small">+R$ @((t.ValorMulta + t.ValorJuros).ToString("N2"))</span>
+                                }
+                                else if (t.ValorDesconto > 0)
+                                {
+                                    <span class="text-success small">-R$ @t.ValorDesconto.ToString("N2")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">R$ 0,00</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted small">A calcular</span>
+                            }
+                        </td>
+                        <td class="fw-semibold text-success">
+                            @(t.Status == StatusContaReceber.PAGO ? $"R$ {t.ValorPago:N2}" : "-")
+                        </td>
+                        <td>
+                            @(t.DataPagamento.HasValue ? t.DataPagamento.Value.ToString("dd/MM/yyyy") : "-")
+                        </td>
+                        <td>
+                            <span class="badge @GetBadgeStatus(t.Status)">@t.Status</span>
+                        </td>
+                        <td class="text-end">
+                            @if (t.Status != StatusContaReceber.PAGO)
+                            {
+                                <button class="btn btn-sm btn-success fw-semibold" @onclick="() => AbrirBaixa(t)">
+                                    💰 Baixar Título
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="badge bg-light text-muted border">Liquidado</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL DE BAIXA DE TÍTULO COM CÁLCULO AUTOMÁTICO DE MULTA, JUROS E DESCONTO -->
+@if (tituloParaBaixa != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">Liquidação / Baixa de Título</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => tituloParaBaixa = null"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="p-3 bg-light rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Documento:</span>
+                            <strong>@tituloParaBaixa.NumeroDocumento</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Cliente:</span>
+                            <span class="fw-semibold">@tituloParaBaixa.Cliente?.RazaoSocial</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Vencimento Original:</span>
+                            <span class="fw-bold">@tituloParaBaixa.DataVencimento.ToString("dd/MM/yyyy")</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Valor Original:</span>
+                            <span class="fw-bold fs-6">R$ @tituloParaBaixa.ValorOriginal.ToString("N2")</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Data do Pagamento:</label>
+                            <input type="date" class="form-control" @bind="dataPagamentoInformada" @bind:after="RecalcularLiquidacao" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Forma de Pagamento:</label>
+                            <select class="form-select" @bind="formaPagamentoSelecionada">
+                                @foreach (var f in Enum.GetValues<FormaPagamento>())
+                                {
+                                    <option value="@f">@f</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- EXIBIÇÃO DO CÁLCULO AUTOMÁTICO (RF24 / RN09) -->
+                    @if (calculoLiquidacao != null)
+                    {
+                        <div class="card border-0 bg-light p-3">
+                            <h6 class="fw-bold mb-2">Detalhamento do Cálculo Automático:</h6>
+                            <div class="d-flex justify-content-between mb-1 small">
+                                <span>Situação do Pagamento:</span>
+                                @if (calculoLiquidacao.TipoCalculo == "ATRASO")
+                                {
+                                    <span class="badge bg-danger">Atraso de @calculoLiquidacao.DiasDiferenca dia(s)</span>
+                                }
+                                else if (calculoLiquidacao.TipoCalculo == "ANTECIPADO")
+                                {
+                                    <span class="badge bg-success">Antecipação de @calculoLiquidacao.DiasDiferenca dia(s)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Pagamento no Vencimento</span>
+                                }
+                            </div>
+
+                            @if (calculoLiquidacao.Multa > 0)
+                            {
+                                <div class="d-flex justify-content-between mb-1 small text-danger">
+                                    <span>Multa por Atraso:</span>
+                                    <span>+ R$ @calculoLiquidacao.Multa.ToString("N2")</span>
+                                </div>
+                            }
+
+                            @if (calculoLiquidacao.Juros > 0)
+                            {
+                                <div class="d-flex justify-content-between mb-1 small text-danger">
+                                    <span>Juros por Dia de Atraso:</span>
+                                    <span>+ R$ @calculoLiquidacao.Juros.ToString("N2")</span>
+                                </div>
+                            }
+
+                            @if (calculoLiquidacao.Desconto > 0)
+                            {
+                                <div class="d-flex justify-content-between mb-1 small text-success">
+                                    <span>Desconto por Antecipação:</span>
+                                    <span>- R$ @calculoLiquidacao.Desconto.ToString("N2")</span>
+                                </div>
+                            }
+
+                            <hr class="my-2" />
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="fs-6">Valor Final a Pagar:</strong>
+                                <strong class="fs-5 text-success">R$ @calculoLiquidacao.ValorFinal.ToString("N2")</strong>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => tituloParaBaixa = null">Cancelar</button>
+                    <button type="button" class="btn btn-success fw-bold px-4" @onclick="ConfirmarBaixa" disabled="@processandoBaixa">
+                        @if (processandoBaixa)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Gravando...</span>
+                        }
+                        else
+                        {
+                            <span>Confirmar Pagamento</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool carregando = true;
+    private List<ContaReceber> todosTitulos = new();
+    private List<ContaReceber> titulosFiltrados = new();
+    private List<Cliente> clientes = new();
+
+    private string filtroStatus = "";
+    private int filtroCliente = 0;
+
+    private ContaReceber? tituloParaBaixa;
+    private DateTime dataPagamentoInformada = DateTime.UtcNow.Date;
+    private FormaPagamento formaPagamentoSelecionada;
+    private CalculoPagamentoResultado? calculoLiquidacao;
+    private bool processandoBaixa = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarTitulos();
+        clientes = await Api.GetClientesAsync();
+    }
+
+    private async Task CarregarTitulos()
+    {
+        carregando = true;
+        todosTitulos = await Api.GetContasReceberAsync();
+        Filtrar();
+        carregando = false;
+    }
+
+    private void Filtrar()
+    {
+        var lista = todosTitulos.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(filtroStatus) && Enum.TryParse<StatusContaReceber>(filtroStatus, out var s))
+        {
+            lista = lista.Where(t => t.Status == s);
+        }
+
+        if (filtroCliente > 0)
+        {
+            lista = lista.Where(t => t.IdCliente == filtroCliente);
+        }
+
+        titulosFiltrados = lista.ToList();
+    }
+
+    private async Task AbrirBaixa(ContaReceber titulo)
+    {
+        tituloParaBaixa = titulo;
+        dataPagamentoInformada = DateTime.UtcNow.Date;
+        formaPagamentoSelecionada = titulo.FormaPagamento;
+        await RecalcularLiquidacao();
+    }
+
+    private async Task RecalcularLiquidacao()
+    {
+        if (tituloParaBaixa == null) return;
+        calculoLiquidacao = await Api.CalcularLiquidacaoAsync(tituloParaBaixa.Id, dataPagamentoInformada);
+    }
+
+    private async Task ConfirmarBaixa()
+    {
+        if (tituloParaBaixa == null) return;
+
+        processandoBaixa = true;
+        var ok = await Api.BaixarTituloAsync(tituloParaBaixa.Id, dataPagamentoInformada, formaPagamentoSelecionada);
+        processandoBaixa = false;
+
+        if (ok)
+        {
+            tituloParaBaixa = null;
+            await CarregarTitulos();
+        }
+    }
+
+    private string GetBadgeStatus(StatusContaReceber status) => status switch
+    {
+        StatusContaReceber.ABERTO => "bg-warning text-dark",
+        StatusContaReceber.PAGO => "bg-success",
+        StatusContaReceber.VENCIDO => "bg-danger",
+        StatusContaReceber.CANCELADO => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+}

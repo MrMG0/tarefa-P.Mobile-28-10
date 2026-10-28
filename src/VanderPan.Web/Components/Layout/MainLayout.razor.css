@@ -1,98 +1,116 @@
 .page {
-    position: relative;
     display: flex;
-    flex-direction: column;
+    min-height: 100vh;
 }
 
 main {
     flex: 1;
+    min-width: 0;
+}
+
+.login-screen {
+    display: grid;
+    min-height: 100vh;
+    place-items: center;
+    padding: 2rem 1rem;
+    background:
+        radial-gradient(ellipse at 18% 16%, rgba(234, 217, 194, 0.62), transparent 34rem),
+        linear-gradient(135deg, #fbf8f3 0%, #f5ecdf 100%);
+}
+
+.login-card {
+    width: min(100%, 450px);
+    border: 1px solid rgba(215, 181, 139, 0.5) !important;
+    box-shadow: 0 1.5rem 4rem rgba(57, 37, 29, 0.12) !important;
+}
+
+.login-brand-mark {
+    display: grid;
+    width: 4.25rem;
+    height: 4.25rem;
+    margin: 0 auto;
+    place-items: center;
+    border: 1px solid #ead9c2;
+    border-radius: 1.35rem;
+    background: #f5ecdf;
+    font-size: 2.2rem;
+}
+
+.login-footer {
+    color: #8c7d70;
+    font-size: 0.82rem;
 }
 
 .sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+    z-index: 2;
+    flex: 0 0 264px;
+    min-height: 100vh;
+    background: #fff;
+    border-right: 1px solid #e9e1d7;
 }
 
 .top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
-    justify-content: flex-end;
-    height: 3.5rem;
-    display: flex;
-    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-height: 4.25rem;
+    background: rgba(255, 255, 255, 0.94) !important;
+    border-bottom: 1px solid #e9e1d7 !important;
+    box-shadow: 0 0.2rem 0.8rem rgba(57, 37, 29, 0.04) !important;
+    backdrop-filter: blur(12px);
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
-    }
-
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
-
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-@media (max-width: 640.98px) {
-    .top-row {
-        justify-content: space-between;
-    }
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
-    }
+.top-row ::deep a,
+.top-row ::deep .btn-link {
+    white-space: nowrap;
+    text-decoration: none;
 }
 
-@media (min-width: 641px) {
-    .page {
-        flex-direction: row;
-    }
+.top-row ::deep a:hover,
+.top-row ::deep .btn-link:hover {
+    text-decoration: underline;
+}
 
-    .sidebar {
-        width: 250px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
-    }
-
-    .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
-    }
-
-    .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
-    }
+.content {
+    max-width: 1680px;
+    margin: 0 auto;
 }
 
 #blazor-error-ui {
-    color-scheme: light only;
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
     position: fixed;
-    width: 100%;
     z-index: 1000;
+    display: none;
+    bottom: 0;
+    left: 0;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.75rem 1.25rem;
+    background: #fff3cd;
+    color: #664d03;
+    box-shadow: 0 -2px 8px rgba(57, 37, 29, 0.12);
 }
 
-    #blazor-error-ui .dismiss {
-        cursor: pointer;
-        position: absolute;
-        right: 0.75rem;
-        top: 0.5rem;
+#blazor-error-ui .dismiss {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    cursor: pointer;
+}
+
+@media (max-width: 640.98px) {
+    .page {
+        display: block;
     }
+
+    .sidebar {
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid #e9e1d7;
+    }
+
+    .top-row {
+        position: relative;
+        padding-right: 1rem !important;
+        padding-left: 1rem !important;
+    }
+}

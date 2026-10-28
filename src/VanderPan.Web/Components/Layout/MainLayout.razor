@@ -6,12 +6,12 @@
 
 @if (!Auth.IsAuthenticated)
 {
-    <div class="container py-5" style="max-width: 460px">
-        <div class="card border-0 shadow p-4">
+    <div class="login-screen">
+        <div class="card login-card border-0 p-4 p-md-5">
             <div class="text-center mb-3">
-                <div class="fs-1">🥖</div>
-                <h1 class="h3 fw-bold">VanderPan</h1>
-                <p class="text-muted">Acesso administrativo</p>
+                <div class="login-brand-mark">🥐</div>
+                <h1 class="h3 fw-bold mt-3 mb-1">VanderPan</h1>
+                <p class="text-muted mb-0">Painel de gestão da distribuidora</p>
             </div>
             <form @onsubmit="EntrarAsync" @onsubmit:preventDefault>
                 <div class="mb-3">
@@ -26,10 +26,13 @@
                 {
                     <div class="alert alert-danger py-2">@erroLogin</div>
                 }
-                <button class="btn btn-primary w-100" type="submit" disabled="@entrando">
+                <button class="btn btn-primary w-100 py-2" type="submit" disabled="@entrando">
                     @(entrando ? "Conectando..." : "Entrar")
                 </button>
             </form>
+            <div class="login-footer text-center mt-4">
+                Produtos frescos, gestão em dia.
+            </div>
         </div>
     </div>
 }
@@ -41,15 +44,15 @@ else
         </div>
 
         <main>
-            <div class="top-row px-4 d-flex justify-content-between align-items-center bg-white border-bottom shadow-sm">
+            <div class="top-row px-4 d-flex justify-content-between align-items-center">
                 <div>
                     <span class="badge bg-warning text-dark me-2">🥖 Distribuidora VanderPan</span>
                     <span class="text-muted small">Painel de Gestão & Distribuição B2B</span>
                 </div>
                 <div class="d-flex align-items-center gap-3">
-                    <span class="badge bg-light text-secondary border">⏰ Janelas de Entrega: 12h & 19h</span>
+                    <span class="badge bg-light text-secondary border">⏰ Entregas: 12h & 19h</span>
                     <span class="fw-semibold text-dark">👤 @Auth.Nome</span>
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="SairAsync">Sair</button>
+                    <button class="btn btn-outline-secondary btn-sm px-3" @onclick="SairAsync">Sair</button>
                 </div>
             </div>
 

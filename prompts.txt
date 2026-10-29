@@ -7,3 +7,5 @@ ok, faça um README.md pro projeto, mostrando como executar a api, site e app
 crie um md pra documentar testes do projeto, anexei um exemplo
 
 melhore a aparencia do site, com tema claro, cores brancas e marrom (referente a pão)
+
+no site, o acesso as operações n funcionam

@@ -52,6 +52,8 @@ O painel usa a conta administrativa:
 - E-mail: `admin@vanderpan.com.br`
 - Senha: `admin123`
 
+No painel web, a sessão é restaurada localmente ao atualizar a página na mesma aba, sem uma chamada extra de validação. Ao fechar a aba ou sair pelo botão **Sair**, será necessário entrar novamente. Se a API for reiniciada, as operações podem exigir um novo login.
+
 O app móvel usa uma conta de vendedor seed:
 
 - E-mail: `carlos@vanderpan.com.br`

@@ -1,5 +1,6 @@
 @page "/pedidos"
 @inject ApiService Api
+@inject ILogger<PedidosRecebidos> Logger
 
 <PageTitle>Pedidos Recebidos - VanderPan</PageTitle>
 
@@ -34,7 +35,7 @@
                 <label class="form-label small fw-semibold">Status do Pedido</label>
                 <select class="form-select" @bind="filtroStatus" @bind:after="Filtrar">
                     <option value="">Todos os status</option>
-                    @foreach (var s in StatusDisponiveis(pedidoSelecionado.Status))
+                    @foreach (var s in Enum.GetValues<StatusPedido>())
                     {
                         <option value="@s">@s</option>
                     }
@@ -58,6 +59,13 @@
 {
     <div class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(erroCarregamento))
+{
+    <div class="alert alert-danger" role="alert">
+        @erroCarregamento
+        <button class="btn btn-sm btn-outline-danger ms-3" @onclick="CarregarPedidos">Tentar novamente</button>
     </div>
 }
 else
@@ -276,22 +284,54 @@ else
     private string filtroJanela = "";
     private string filtroStatus = "";
     private int filtroVendedor = 0;
+    private string? erroCarregamento;
 
     private Pedido? pedidoSelecionado;
     private StatusPedido novoStatus;
 
     protected override async Task OnInitializedAsync()
     {
-        await CarregarPedidos();
-        vendedores = await Api.GetVendedoresAsync();
+        await CarregarDados();
     }
 
     private async Task CarregarPedidos()
     {
+        await CarregarDados(carregarVendedores: false);
+    }
+
+    private async Task CarregarDados(bool carregarVendedores = true)
+    {
         carregando = true;
-        todosPedidos = await Api.GetPedidosAsync();
-        Filtrar();
-        carregando = false;
+        erroCarregamento = null;
+        try
+        {
+            todosPedidos = await Api.GetPedidosAsync();
+            if (carregarVendedores)
+            {
+                vendedores = await Api.GetVendedoresAsync();
+            }
+
+            Filtrar();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "Falha ao carregar pedidos do painel.");
+            erroCarregamento = "Não foi possível carregar os pedidos e os dados dos filtros. Verifique a conexão com a API e tente novamente.";
+        }
+        catch (TaskCanceledException ex)
+        {
+            Logger.LogError(ex, "Tempo esgotado ao carregar pedidos do painel.");
+            erroCarregamento = "A API demorou demais para responder. Tente carregar os pedidos novamente.";
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            Logger.LogError(ex, "A API retornou dados inválidos ao carregar pedidos.");
+            erroCarregamento = "A API retornou dados inválidos para os pedidos. Tente novamente.";
+        }
+        finally
+        {
+            carregando = false;
+        }
     }
 
     private void Filtrar()
@@ -326,26 +366,6 @@ else
     private void FecharDetalhes()
     {
         pedidoSelecionado = null;
-    }
-
-    private static IEnumerable<StatusPedido> StatusDisponiveis(StatusPedido status)
-    {
-        yield return status;
-        var proximo = status switch
-        {
-            StatusPedido.PENDENTE => StatusPedido.CORTADO,
-            StatusPedido.CORTADO => StatusPedido.CONFIRMADO,
-            StatusPedido.CONFIRMADO => StatusPedido.EM_SEPARACAO,
-            StatusPedido.EM_SEPARACAO => StatusPedido.ENVIADO,
-            StatusPedido.ENVIADO => StatusPedido.ENTREGUE,
-            _ => (StatusPedido?)null
-        };
-        if (proximo.HasValue) yield return proximo.Value;
-        if (status is StatusPedido.PENDENTE or StatusPedido.CORTADO or
-            StatusPedido.CONFIRMADO or StatusPedido.EM_SEPARACAO)
-        {
-            yield return StatusPedido.CANCELADO;
-        }
     }
 
     private async Task AlterarStatusPedido()

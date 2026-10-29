@@ -3,8 +3,19 @@
 @inject AuthState Auth
 @inject ApiService Api
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+@using System.Text.Json
 
-@if (!Auth.IsAuthenticated)
+@if (restaurandoSessao)
+{
+    <div class="login-screen">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Restaurando sessão...</p>
+        </div>
+    </div>
+}
+else if (!Auth.IsAuthenticated)
 {
     <div class="login-screen">
         <div class="card login-card border-0 p-4 p-md-5">
@@ -74,10 +85,52 @@ else
     private string senha = string.Empty;
     private string? erroLogin;
     private bool entrando;
+    private bool restaurandoSessao = true;
+    private const string ChaveSessao = "vanderpan.session-token";
 
     protected override void OnInitialized()
     {
         Auth.OnChange += Atualizar;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            var sessaoSalva = await JS.InvokeAsync<string?>("sessionStorage.getItem", ChaveSessao);
+            if (!string.IsNullOrWhiteSpace(sessaoSalva))
+            {
+                try
+                {
+                    var sessao = JsonSerializer.Deserialize<LoginResponse>(sessaoSalva);
+                    if (sessao is null || string.IsNullOrWhiteSpace(sessao.Token))
+                    {
+                        throw new JsonException("Dados de sessão incompletos.");
+                    }
+
+                    Auth.Login(sessao);
+                }
+                catch (JsonException)
+                {
+                    await JS.InvokeVoidAsync("sessionStorage.removeItem", ChaveSessao);
+                    erroLogin = "A sessão salva está inválida. Entre novamente.";
+                }
+            }
+        }
+        catch (JSException)
+        {
+            erroLogin = "Não foi possível acessar o armazenamento da sessão neste navegador.";
+        }
+        finally
+        {
+            restaurandoSessao = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task EntrarAsync()
@@ -89,6 +142,7 @@ else
             var resultado = await Api.LoginAdminAsync(email, senha);
             if (resultado.Sucesso)
             {
+                await JS.InvokeVoidAsync("sessionStorage.setItem", ChaveSessao, JsonSerializer.Serialize(resultado));
                 Auth.Login(resultado);
                 senha = string.Empty;
             }
@@ -96,6 +150,10 @@ else
             {
                 erroLogin = resultado.Mensagem;
             }
+        }
+        catch (JSException)
+        {
+            erroLogin = "Não foi possível salvar a sessão neste navegador. Verifique as permissões de armazenamento.";
         }
         finally
         {
@@ -113,6 +171,7 @@ else
         {
             Auth.Logout();
             Nav.NavigateTo("/");
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", ChaveSessao);
         }
     }
 

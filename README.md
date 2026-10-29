@@ -45,6 +45,8 @@ dotnet run --project .\src\VanderPan.Web\VanderPan.Web.csproj --launch-profile h
 
 Abra `http://localhost:5100` no navegador. A API precisa continuar rodando enquanto o painel estiver em uso.
 
+Em ambiente de desenvolvimento, a API cria automaticamente um cenário para testar o corte de pedidos: o produto **Produto Demonstração - Corte de Estoque** tem 12 kg em estoque e três pedidos pendentes somam 24 kg. Acesse **Operações > Corte de Pedidos**, selecione esse produto, mantenha **Todas as Janelas** e clique em **Calcular Sugestão**. Revise as quantidades e use **Confirmar e Aplicar Corte** para concluir. Os pedidos de demonstração são identificados pela observação `DEMO-CORTE-ESTOQUE` e não alteram o estoque dos outros produtos.
+
 ### Contas de demonstração
 
 O painel usa a conta administrativa:

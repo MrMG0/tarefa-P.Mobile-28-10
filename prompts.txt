@@ -9,3 +9,5 @@ crie um md pra documentar testes do projeto, anexei um exemplo
 melhore a aparencia do site, com tema claro, cores brancas e marrom (referente a pão)
 
 no site, o acesso as operações n funcionam
+
+no site, preciso testar o corte de pedidos, preencha as informacoes e etc para eu realizar um uso dela

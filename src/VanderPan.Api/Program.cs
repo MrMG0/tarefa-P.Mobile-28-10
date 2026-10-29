@@ -67,6 +67,13 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<VanderPanDbContext>();
         DbInitializer.Initialize(context);
         app.Logger.LogInformation("Banco de dados VanderPan inicializado com sucesso.");
+        if (app.Environment.IsDevelopment())
+        {
+            var pedidosDemoCriados = DbInitializer.InitializeCutDemoData(context);
+            app.Logger.LogInformation(
+                "Dados de demonstração do corte inicializados; {PedidoCount} pedido(s) criado(s).",
+                pedidosDemoCriados);
+        }
     }
     catch (Exception ex)
     {

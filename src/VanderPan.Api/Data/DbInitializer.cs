@@ -7,6 +7,9 @@ namespace VanderPan.Api.Data;
 
 public static class DbInitializer
 {
+    private const string ProdutoCorteDemo = "Produto Demonstração - Corte de Estoque";
+    private const string MarcadorPedidoCorteDemo = "DEMO-CORTE-ESTOQUE";
+
     public static void Initialize(VanderPanDbContext context)
     {
         context.Database.EnsureCreated();
@@ -291,5 +294,92 @@ public static class DbInitializer
         };
         context.ContasReceber.AddRange(cr1, cr2);
         context.SaveChanges();
+    }
+
+    public static int InitializeCutDemoData(VanderPanDbContext context)
+    {
+        var vendedor = context.Vendedores.FirstOrDefault(v => v.Email == "carlos@vanderpan.com.br");
+        var clientes = context.Clientes
+            .Where(c => c.NomeFantasia == "Panificadora Pão Dourado"
+                || c.NomeFantasia == "Doce Pão"
+                || c.NomeFantasia == "Padaria Esperança")
+            .ToDictionary(c => c.NomeFantasia!);
+        var categoria = context.Categorias.FirstOrDefault(c => c.Nome == "Farinhas e Melhoradores");
+
+        if (vendedor is null || categoria is null ||
+            !clientes.ContainsKey("Panificadora Pão Dourado") ||
+            !clientes.ContainsKey("Doce Pão") ||
+            !clientes.ContainsKey("Padaria Esperança"))
+        {
+            throw new InvalidOperationException(
+                "Não foi possível criar os pedidos de demonstração do corte: os dados base de desenvolvimento estão incompletos.");
+        }
+
+        var produto = context.Produtos.FirstOrDefault(p => p.Nome == ProdutoCorteDemo);
+        if (produto is null)
+        {
+            produto = new Produto
+            {
+                Nome = ProdutoCorteDemo,
+                Descricao = "Produto exclusivo para testar a sugestão e aplicação de corte de estoque.",
+                Preco = 10.00m,
+                IdCategoria = categoria.Id,
+                Disponivel = true,
+                Estoque = 12.000m,
+                UnidadeMedida = UnidadeMedida.KG,
+                Perecivel = false,
+                Ativo = true
+            };
+            context.Produtos.Add(produto);
+            context.SaveChanges();
+        }
+
+        var pedidosDemo = new[]
+        {
+            (Codigo: $"{MarcadorPedidoCorteDemo}-01", Cliente: "Panificadora Pão Dourado", Quantidade: 10.000m, Janela: JanelaEntrega.H12),
+            (Codigo: $"{MarcadorPedidoCorteDemo}-02", Cliente: "Doce Pão", Quantidade: 8.000m, Janela: JanelaEntrega.H19),
+            (Codigo: $"{MarcadorPedidoCorteDemo}-03", Cliente: "Padaria Esperança", Quantidade: 6.000m, Janela: JanelaEntrega.H12)
+        };
+        var adicionados = 0;
+
+        foreach (var demo in pedidosDemo)
+        {
+            if (context.Pedidos.Any(p => p.Observacao == demo.Codigo))
+            {
+                continue;
+            }
+
+            var cliente = clientes[demo.Cliente];
+            var subtotal = Math.Round(produto.Preco * demo.Quantidade, 2);
+            context.Pedidos.Add(new Pedido
+            {
+                IdVendedor = vendedor.Id,
+                IdCliente = cliente.Id,
+                DataPedido = DateTime.UtcNow,
+                Status = StatusPedido.PENDENTE,
+                JanelaEntrega = demo.Janela,
+                Observacao = demo.Codigo,
+                ValorTotal = subtotal,
+                Itens = new List<ItemPedido>
+                {
+                    new()
+                    {
+                        IdProduto = produto.Id,
+                        QuantidadePedida = demo.Quantidade,
+                        QuantidadeEntregue = demo.Quantidade,
+                        PrecoUnitario = produto.Preco,
+                        Subtotal = subtotal
+                    }
+                }
+            });
+            adicionados++;
+        }
+
+        if (adicionados > 0)
+        {
+            context.SaveChanges();
+        }
+
+        return adicionados;
     }
 }
